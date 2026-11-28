@@ -2875,10 +2875,15 @@ function renderUpdate() {
   if ($("updBox").dataset.html !== h) { $("updBox").innerHTML = h; $("updBox").dataset.html = h; }
 }
 let firstSnapshot = true, quitting = false, bootVersion = null;
-function connect() {
-  const ws = new WebSocket(`ws://${location.host}/ws`);
-  ws.onmessage = ev => {
-    S = JSON.parse(ev.data);
+// Selaimen virheet ja yhteystapahtumat ohjelman lokiin (vianetsintä esim. tabletilla)
+function clientLog(msg) {
+  try { fetch("/api/clientlog", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({msg: String(msg).slice(0, 500)})}); } catch (e) { /* ei lokia */ }
+}
+window.addEventListener("error", e => clientLog("JS: " + e.message + " @" + (e.lineno || "?") + " " + navigator.userAgent));
+window.addEventListener("unhandledrejection", e => clientLog("JS (promise): " + (e.reason && e.reason.message || e.reason)));
+let wsOk = false, pollMode = false, wsFails = 0;
+function onSnapshot(text) {
+  S = JSON.parse(text);
     offset = S.now - Date.now() / 1000;
     if (bootVersion && S.version !== bootVersion) { location.reload(); return; }   // päivitetty versio -> uusi sivu
     bootVersion = bootVersion || S.version;
@@ -2886,8 +2891,41 @@ function connect() {
     if (firstSnapshot) { firstSnapshot = false; applyTheme(S.config.theme); initLang(); seenAlerts = lastNotified = maxAlertSeq(); showTab(TAB); }
     handleAlerts();
     render();
+}
+// Varatie: jos WebSocket ei aukea (esim. jokin selain tai verkko estää sen), tila haetaan HTTP:llä 1,5 s välein.
+async function pollLoop() {
+  while (pollMode && !quitting) {
+    try {
+      const r = await fetchT("/api/snapshot", 10000);
+      if (r.status === 401) { location.href = "/login"; return; }
+      onSnapshot(await r.text());
+    } catch (e) {
+      $("dot").className = "dot"; $("statusText").textContent = T("Sovellus ei vastaa – onko se suljettu? Yritetään uudelleen…");
+    }
+    await new Promise(res => setTimeout(res, 1500));
+  }
+}
+function connect() {
+  if (pollMode) return;
+  const ws = new WebSocket(`ws://${location.host}/ws`);
+  let got = false;
+  const guard = setTimeout(() => {          // ei yhtään viestiä 8 s:ssa → HTTP-varatie
+    if (got) return;
+    clientLog("WebSocket ei avautunut 8 s:ssa (tila " + ws.readyState + ") – siirrytään HTTP-hakuun. " + navigator.userAgent);
+    pollMode = true; try { ws.close(); } catch (e) { /* */ } pollLoop();
+  }, 8000);
+  ws.onmessage = ev => {
+    if (!got) { got = true; wsOk = true; wsFails = 0; clearTimeout(guard); }
+    try { onSnapshot(ev.data); } catch (e) { clientLog("Tilan käsittely: " + e.message); throw e; }
   };
-  ws.onclose = () => {
+  ws.onclose = ev => {
+    clearTimeout(guard);
+    if (pollMode) return;
+    if (!got) {
+      wsFails++;
+      clientLog("WebSocket suljettu ennen ensimmäistä viestiä (koodi " + ev.code + ") " + navigator.userAgent);
+      if (wsFails >= 2 && !wsOk && !quitting) { pollMode = true; pollLoop(); return; }
+    }
     if (quitting) { $("dot").className = "dot"; $("statusText").textContent = "Ohjelma on suljettu. Voit sulkea tämän välilehden."; return; }
     $("dot").className = "dot";
     $("statusText").textContent = S && S.update && S.update.busy ? T("Päivitetään – ohjelma käynnistyy uudelleen…")
@@ -3780,7 +3818,7 @@ player.on(() => { renderPlayer(); render(); renderNets(); });
 $("pVol").value = player.volume;
 $("pVol").oninput = e => player.setVolume(e.target.value);
 $("pChips").addEventListener("click", e => { const b = e.target.closest("[data-leave]"); if (b) player.toggle(Number(b.dataset.leave)); });
-setInterval(render, 1000);
+setInterval(() => { if (S) render(); }, 1000);   // ei ennen ensimmäistä tilaa
 connect();
 
 // ---------------------------------------------------------------------------

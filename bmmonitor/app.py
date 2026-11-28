@@ -1046,16 +1046,41 @@ def make_app(mon: Monitor) -> web.Application:
         return web.FileResponse(STATIC_DIR / "index.html")
 
     async def ws_handler(request):
+        remote = request.get(REMOTE_KEY)
+        if remote:
+            log.info("Lähiverkko: WebSocket %s (%s)", request.remote, request.headers.get("User-Agent", "")[:80])
         ws = web.WebSocketResponse(heartbeat=30)
         await ws.prepare(request)
         mon.clients.add(ws)
-        await ws.send_str(json.dumps(mon.snapshot(), ensure_ascii=False, default=str))
         try:
+            await ws.send_str(json.dumps(mon.snapshot(), ensure_ascii=False, default=str))
             async for _ in ws:
                 pass
         finally:
             mon.clients.discard(ws)
+            if remote:
+                log.info("Lähiverkko: WebSocket suljettu %s", request.remote)
         return ws
+
+    async def snapshot_http(_):
+        """Sama tila kuin WebSocketissa – varatie selaimille, joissa WebSocket ei aukea."""
+        return web.Response(text=json.dumps(mon.snapshot(), ensure_ascii=False, default=str), content_type="application/json")
+
+    client_log_t: list = []
+
+    async def client_log(request):
+        """Selaimen virheet ja yhteystapahtumat ohjelman lokiin (vianetsintä etälaitteilla)."""
+        now = time.time()
+        client_log_t[:] = [t for t in client_log_t if now - t < 60]
+        if len(client_log_t) < 30:
+            client_log_t.append(now)
+            try:
+                body = await request.json()
+            except Exception:  # noqa: BLE001
+                body = {}
+            log.info("Selain %s%s: %s", request.remote, " (lähiverkko)" if request.get(REMOTE_KEY) else "",
+                     str(body.get("msg", ""))[:500])
+        return web.json_response({"ok": True})
 
     async def get_config(_):
         return web.json_response(mon.public_config())
@@ -1686,6 +1711,8 @@ def make_app(mon: Monitor) -> web.Application:
     app.router.add_get("/api/lan/qr.svg", lan_qr)
     app.router.add_get("/", index)
     app.router.add_get("/ws", ws_handler)
+    app.router.add_get("/api/snapshot", snapshot_http)
+    app.router.add_post("/api/clientlog", client_log)
     app.router.add_get("/api/config", get_config)
     app.router.add_post("/api/config", post_config)
     app.router.add_post("/api/clear", clear)

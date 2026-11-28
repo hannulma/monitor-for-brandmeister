@@ -1591,11 +1591,15 @@ def test_lan_access(tmp_path, monkeypatch):
             r = await s.get(rem + "/", allow_redirects=False)
             assert r.status == 302 and r.headers["Location"] == "/login"
             assert (await s.get(rem + "/api/config")).status == 401
+            assert (await s.get(rem + "/api/snapshot")).status == 401
             assert "password" in (await (await s.get(rem + "/login")).text())
             r = await s.post(rem + "/api/lan/login", json={"password": "väärä"})
             assert r.status == 401
             r = await s.post(rem + "/api/lan/login", json={"password": "salasana1"})
             assert (await r.json())["ok"]
+            snap = await (await s.get(rem + "/api/snapshot")).json()
+            assert "talkgroups" in snap and "version" in snap
+            assert (await (await s.post(rem + "/api/clientlog", json={"msg": "testi"})).json())["ok"]
             me = await (await s.get(rem + "/api/lan/me")).json()
             assert me == {"remote": True, "mode": "full"}
             cfg = await (await s.get(rem + "/api/config")).json()
