@@ -873,6 +873,23 @@
     "Vain katselu": "View only",
     "Yhteys lähiverkossa on salaamaton (HTTP). Älä avaa porttia reitittimestä internetiin. Kun asetus otetaan käyttöön ensimmäisen kerran, Windowsin tai macOS:n palomuuri voi kysyä lupaa – salli yksityiset verkot.": "The connection on the local network is unencrypted (HTTP). Do not open the port to the internet in your router. When you turn this on for the first time, the Windows or macOS firewall may ask for permission – allow private networks.",
     "kirjautuneita etälaitteita: {n}": "remote devices logged in: {n}",
+    "Avaa ensin osoite tällä koneella selaimeen. Jos sivu ei aukea täälläkään, portti on jo toisen ohjelman käytössä – vaihda portti.": "First open the address in a browser on this computer. If the page doesn't open here either, another program is using the port – change the port.",
+    "Etälaite ei saa yhteyttä?": "Remote device can't connect?",
+    "Hyväksy Windowsin kysymys…": "Accept the Windows prompt…",
+    "Jos sivu jää tilaan ”Yhdistetään…”, lataa sivu uudelleen. Ohjelma tallentaa etälaitteen virheet lokiin (Asetukset → Palaute).": "If the page stays at “Connecting…”, reload it. The program writes the remote device's errors to its log (Settings → Feedback).",
+    "Kokeile osoitteita järjestyksessä. Ensimmäinen on yleensä oikea; virtuaali- ja VPN-sovittimien osoitteet eivät toimi kotiverkon laitteilta.": "Try the addresses in order. The first one is usually right; addresses of virtual and VPN adapters don't work from devices on your home network.",
+    "Laitteiden pitää olla samassa verkossa. Vierasverkko tai reitittimen ”AP-eristys” estää laitteita näkemästä toisiaan.": "The devices must be on the same network. A guest network or the router's “AP isolation” stops devices from seeing each other.",
+    "Palomuurissa on ohjelman saapuvat yhteydet estävä sääntö ({n} kpl). Painike poistaa sen käytöstä.": "The firewall has a rule blocking the program's incoming connections ({n}). The button disables it.",
+    "Palvelin- ja syöteosoitteita voi muuttaa vain ohjelman omalla koneella.": "Server and feed addresses can only be changed on the program's own computer.",
+    "Salli palomuurissa": "Allow in firewall",
+    "Verkkoyhteys {x} on Julkinen-profiilissa: vaihda se Yksityiseksi Windowsin verkkoasetuksista.": "Network connection {x} uses the Public profile: change it to Private in the Windows network settings.",
+    "Windows: verkkoprofiilin pitää olla Yksityinen (Asetukset → Verkko ja Internet → yhteyden ominaisuudet) ja palomuurissa sallittu – käytä yllä olevaa painiketta.": "Windows: the network profile must be Private (Settings → Network & Internet → connection properties) and allowed in the firewall – use the button above.",
+    "Windowsin palomuuri: portille ei ole sallintasääntöä": "Windows firewall: no allow rule for the port",
+    "Windowsin palomuuri: portti sallittu yksityisissä verkoissa": "Windows firewall: port allowed on private networks",
+    "koneen nimi – toimii, jos laite tukee .local-nimiä": "computer name – works if the device supports .local names",
+    "macOS: Järjestelmäasetukset → Verkko → Palomuuri → Asetukset: salli ohjelman saapuvat yhteydet.": "macOS: System Settings → Network → Firewall → Options: allow incoming connections for the program.",
+    "suositeltu": "recommended",
+    "virtuaali- tai VPN-sovitin": "virtual or VPN adapter",
   };
 
   const ATTRS = ["placeholder", "title", "aria-label"];

@@ -147,9 +147,16 @@ The tabs are grouped: **BrandMeister · Statistics · Friends · Devices · Chec
 - **Browser access on the local network** (App → Browser access on the local network, off by default) – use the
   program from your phone, tablet or another computer on the home network. Remote devices log in with a password
   (at least 8 characters); choose *Full access* or *View only*. A remote device can never close or update the program,
-  change keys, passwords or these settings, or download the feedback log bundle. The page shows the addresses and a QR
-  code. The connection is unencrypted HTTP – never forward the port to the internet; allow private networks if the
-  firewall asks.
+  change keys, passwords, server and feed addresses or these settings, or download the feedback log bundle. The page
+  lists every address of the computer with its adapter name (virtual and VPN adapters marked, plus
+  *computer-name.local*) and a QR code for each. A login survives restarts and updates for 30 days; *Log out remote
+  devices* or a password change invalidates every login. On Windows the page shows the firewall status and an
+  *Allow in firewall* button (asks for administrator approval). The connection is unencrypted HTTP – never forward the
+  port to the internet.
+
+  **If a remote device can't connect:** first open the address on the program's computer; check that the Windows
+  network profile is *Private*, not *Public*; try the other listed addresses (`ipconfig` in a command prompt shows the
+  computer's addresses); make sure the device isn't on a guest network or behind the router's AP isolation.
 - **English, Finnish, German (Deutsch), Spanish (Español) and French (Français)** – choose the language on the App tab; on first start it follows the
   operating system language (English otherwise). It covers the user interface, the program's own alerts and the
   replies sent to your radio (radio commands: `CMD`, `WHO`, `NOW`, in Finnish also `OHJE`, `KUKA`, `NYT`). The German,

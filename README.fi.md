@@ -237,9 +237,16 @@ käyttöliittymä omassa ikkunassa tai selaimessa; **näytettävät välilehdet*
 - **Selainkäyttö lähiverkossa** (Ohjelma → Selainkäyttö lähiverkossa, oletus pois) – ohjelmaa voi käyttää puhelimella,
   tabletilla tai toisella koneella kotiverkossa. Etälaitteelta kirjaudutaan salasanalla (vähintään 8 merkkiä);
   käyttöoikeudeksi *Täysi käyttö* tai *Vain katselu*. Etälaitteelta ei voi koskaan sulkea tai päivittää ohjelmaa,
-  muuttaa avaimia, salasanoja tai näitä asetuksia eikä ladata palautteen lokipakettia. Sivulla näkyvät osoitteet ja
-  QR-koodi. Yhteys on salaamaton HTTP – älä avaa porttia reitittimestä internetiin; salli yksityiset verkot, jos
-  palomuuri kysyy.
+  muuttaa avaimia, salasanoja, palvelin- ja syöteosoitteita tai näitä asetuksia eikä ladata palautteen lokipakettia.
+  Sivulla näkyvät kaikki koneen osoitteet sovittimen nimen kanssa (virtuaali- ja VPN-sovittimet merkittyinä, myös
+  *koneen-nimi.local*) ja QR-koodi kullekin. Kirjautuminen säilyy ohjelman uudelleenkäynnistyksen ja päivityksen yli
+  30 päivää; *Kirjaa etälaitteet ulos* tai salasanan vaihto mitätöi kaikki kirjautumiset. Windowsissa sivu näyttää
+  palomuurin tilan ja painikkeen *Salli palomuurissa* (pyytää järjestelmänvalvojan luvan). Yhteys on salaamaton
+  HTTP – älä avaa porttia reitittimestä internetiin.
+
+  **Jos etälaite ei saa yhteyttä:** avaa osoite ensin ohjelman koneella selaimeen; tarkista, että Windowsin
+  verkkoprofiili on *Yksityinen* eikä *Julkinen*; kokeile muita listattuja osoitteita (komentokehotteessa `ipconfig`
+  näyttää koneen osoitteet); varmista, ettei laite ole vierasverkossa tai reitittimen AP-eristyksen takana.
 - **Kieli (suomi / English / Deutsch / Español / Français)** koskee käyttöliittymää, ohjelman omia hälytyksiä ja radioon lähetettäviä vastauksia.
   Ensimmäisellä käynnistyksellä kieli valitaan käyttöjärjestelmän kielen mukaan (muuten englanti). Radiokomennot toimivat
   suomeksi ja englanniksi (`OHJE`/`CMD`, `KUKA`/`WHO`, `NYT`/`NOW`; saksaksi, espanjaksi ja ranskaksi käytetään englanninkielisiä). Saksan-, espanjan- ja ranskankielinen

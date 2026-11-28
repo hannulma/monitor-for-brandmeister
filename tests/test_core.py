@@ -1560,7 +1560,8 @@ def test_lan_access(tmp_path, monkeypatch):
         L.normalize_lan({"port": 80}, {})
     assert L.has_secret_change({"log": {"qrz_key": "abc"}}, ["qrz_key"]) and not L.has_secret_change({"log": {"qrz_key": "********"}}, ["qrz_key"])
     assert L.has_secret_change({"messaging": {"passcode": "1234"}}, []) and not L.has_secret_change({"units": "metric"}, [])
-    acc = L.LanAccess()
+    sec = {"v": h + "|gen1"}
+    acc = L.LanAccess(lambda: sec["v"])
     for _ in range(5):
         with pytest.raises(PermissionError):
             acc.login("1.2.3.4", "x", h)
@@ -1568,7 +1569,35 @@ def test_lan_access(tmp_path, monkeypatch):
     with pytest.raises(PermissionError):
         acc.login("1.2.3.4", "salasana1", h)               # estetty, vaikka salasana oikein
     tok = acc.login("5.6.7.8", "salasana1", h)
-    assert acc.check(tok) and not acc.check("x")
+    assert acc.check(tok) and not acc.check("x") and len(acc.sessions) == 1
+    assert L.LanAccess(lambda: sec["v"]).check(tok)                 # säilyy uudelleenkäynnistyksen yli
+    assert not acc.check(tok[:-1] + ("A" if tok[-1] != "A" else "B"))  # väärennetty allekirjoitus
+    assert acc.renew(tok) is None                                     # tuore eväste: ei uusita vielä
+    exp, nonce, _ = tok.split(".")
+    old = f"{int(time.time()) + 86400}.{nonce}"
+    old_tok = f"{old}.{acc._mac(old)}"
+    assert acc.check(old_tok) and acc.renew(old_tok)                  # lähellä vanhenemista → uusi eväste
+    gone = f"{int(time.time()) - 1}.{nonce}"
+    assert not acc.check(f"{gone}.{acc._mac(gone)}")                  # vanhentunut
+    sec["v"] = h + "|gen2"                                            # uusi sukupolvi = kaikki ulos
+    assert not acc.check(tok)
+    sec["v"] = h + "|gen1"
+    acc.logout(tok)
+    assert not acc.check(tok)
+    sec["v"] = ""
+    with pytest.raises(PermissionError):
+        acc.login("9.9.9.9", "salasana1", "")
+    cfg = {"map_tiles": "https://t/{z}/{x}/{y}.png", "messaging": {"server": "rotate.aprs2.net", "port": 14580,
+           "feeds": [{"url": "https://a/feed"}]}, "nets": {"sources": [{"url": "https://c/x.ics"}]},
+           "aprsrx": {"host": "127.0.0.1", "port": 8001, "radios": [{"type": "kiss_tcp", "host": "127.0.0.1", "port": 8001}]}}
+    assert not L.has_address_change({"units": "metric", "messaging": {"server": "rotate.aprs2.net", "port": "14580",
+                                     "feeds": [{"url": "https://a/feed", "enabled": False}]}}, cfg)
+    assert not L.has_address_change({"nets": {"sources": []}, "aprsrx": {"radios": [{"type": "kiss_tcp", "host": "127.0.0.1",
+                                     "port": 8001, "enabled": False}, {"type": "serial", "serial": "COM5"}]}}, cfg)
+    for bad in ({"map_tiles": "http://192.168.1.1/{z}/{x}/{y}"}, {"messaging": {"server": "10.0.0.1"}},
+                {"messaging": {"feeds": [{"url": "http://192.168.1.1/admin"}]}}, {"nets": {"sources": [{"url": "webcal://x/y.ics"}]}},
+                {"aprsrx": {"radios": [{"type": "agwpe", "host": "10.0.0.5", "port": 22}]}}, {"aprsrx": {"port": 22}}):
+        assert L.has_address_change(bad, cfg), bad
     assert "<svg" in (L.qr_svg("http://192.168.1.2:8766/") or "<svg")
 
     async def run():
@@ -1608,9 +1637,11 @@ def test_lan_access(tmp_path, monkeypatch):
             assert (await r.json())["ok"]                                  # täysi käyttö: tavallinen asetus käy
             for path, body in (("/api/shutdown", {}), ("/api/update/install", {}), ("/api/lan", {"enabled": False}),
                                ("/api/config", {"bm_api_key": "uusi"}), ("/api/config", {"lan": {"enabled": False}}),
-                               ("/api/checkin", {"action": "sheet_disconnect"})):
+                               ("/api/checkin", {"action": "sheet_disconnect"}),
+                               ("/api/config", {"messaging": {"feeds": [{"url": "http://192.168.1.1/"}]}})):
                 assert (await s.post(rem + path, json=body)).status == 403, path
             assert (await s.get(rem + "/api/feedback/bundle")).status == 403
+            assert (await s.get(rem + "/api/feeds/preview?url=http://192.168.1.1/")).status == 403
             r = await s.post(rem + "/api/config", json={"units": "metric"}, headers={"Origin": "http://evil.example"})
             assert r.status == 403
         async with aiohttp.ClientSession() as s:                           # paikallinen: Vain katselu päälle
@@ -1623,6 +1654,13 @@ def test_lan_access(tmp_path, monkeypatch):
             assert (await s.post(rem + "/api/config", json={"units": "metric"})).status == 403
             assert (await s.post(rem + "/api/lan/logout")).status == 200
             assert (await s.get(rem + "/api/config")).status == 401
+            await s.post(rem + "/api/lan/login", json={"password": "salasana1"})
+            assert (await s.get(rem + "/api/config")).status == 200
+            mon.lan = L.LanAccess(mon.lan.secret)                           # "uudelleenkäynnistys": eväste kelpaa yhä
+            assert (await s.get(rem + "/api/config")).status == 200
+            async with aiohttp.ClientSession() as s2:
+                assert (await s2.post(loc + "/api/lan/logout_all")).status == 200
+            assert (await s.get(rem + "/api/config")).status == 401          # uusi sukupolvi mitätöi evästeen
         async with aiohttp.ClientSession() as s:
             await s.post(loc + "/api/lan", json={"enabled": False})
         assert mon.lan_site is None
@@ -1636,6 +1674,14 @@ def test_lan_host_and_ws_chunks():
     import socket as _s
     from bmmonitor import lan as L
     from bmmonitor import app as A
+    mac = "lo0: flags=8049<UP>\n\tinet 127.0.0.1 netmask 0xff000000\nen0: flags=8863<UP>\n\tinet6 fe80::1\n\tinet 192.168.1.20 netmask 0xffffff00\nutun3: flags=8051<UP>\n\tinet 100.101.2.3 --> 100.101.2.3\n"
+    assert L._parse_ifconfig(mac) == [("lo0", "127.0.0.1"), ("en0", "192.168.1.20"), ("utun3", "100.101.2.3")]
+    assert L._parse_ip_addr("2: eth0    inet 10.0.0.5/24 brd 10.0.0.255 scope global eth0\n3: docker0    inet 172.17.0.1/16") == \
+        [("eth0", "10.0.0.5"), ("docker0", "172.17.0.1")]
+    assert L._parse_win_json('{"IPAddress":"192.168.1.9","InterfaceAlias":"Wi-Fi"}') == [("Wi-Fi", "192.168.1.9")]
+    assert L._parse_win_json('[{"IPAddress":"172.20.0.1","InterfaceAlias":"vEthernet (WSL)"}]')[0][0].startswith("vEthernet")
+    assert L.VIRTUAL_RE.search("vEthernet (WSL)") and L.VIRTUAL_RE.search("utun3") and not L.VIRTUAL_RE.search("Wi-Fi") \
+        and not L.VIRTUAL_RE.search("Ethernet") and not L.VIRTUAL_RE.search("en0")
     for ok in ("127.0.0.1:8765", "192.168.1.20:8766", "[::1]:8765", "localhost:8765", "localhost", _s.gethostname() + ":1", ""):
         assert L.host_allowed(ok), ok
     for bad in ("evil.example", "evil.example:8765", "127.0.0.1.nip.io:8765"):

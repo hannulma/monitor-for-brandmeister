@@ -10,13 +10,15 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import re
 import secrets
 import socket
+import sys
 import time
 
 from .i18n import tr
 
-DEFAULT_LAN = {"enabled": False, "port": 8766, "mode": "full", "pw": ""}
+DEFAULT_LAN = {"enabled": False, "port": 8766, "mode": "full", "pw": "", "gen": ""}
 MODES = ("full", "view")
 COOKIE = "bmm_lan"
 SESSION_DAYS = 30
@@ -26,10 +28,30 @@ MIN_PW = 8
 # aina kielletyt etälaitteelta (polku, metodi)
 REMOTE_DENY = {("/api/update/install", "POST"), ("/api/shutdown", "POST"), ("/api/ui/show", "POST"),
                ("/api/feedback/bundle", "GET"), ("/api/feedback/send", "POST"), ("/api/lan", "POST"),
-               ("/api/lan/logout_all", "POST")}
+               ("/api/lan/logout_all", "POST"), ("/api/feeds/preview", "GET"),
+               ("/api/lan/firewall", "GET"), ("/api/lan/firewall", "POST")}
 REMOTE_PUBLIC = {"/login", "/api/lan/login"}
 CONFIG_DENY = ("lan", "ui")          # asetusavaimet, joita ei voi muuttaa etänä
 SECRET_FIELDS = (("bm_api_key",), ("messaging", "passcode"), ("ais", "key"))
+# Osoitteet, joihin ohjelma itse ottaa yhteyttä. Etälaite ei saa vaihtaa niitä, jottei lähiverkon
+# laitteella voi ohjata ohjelmaa hakemaan tietoa mielivaltaisista osoitteista (esim. reitittimen hallinta).
+ADDRESS_FIELDS = (("map_tiles",), ("feedback_url",), ("messaging", "server"), ("messaging", "port"),
+                  ("aprsrx", "host"), ("aprsrx", "port"))
+
+
+def _url(i: dict) -> str:
+    u = str(i.get("url") or "").strip()
+    return "https://" + u[len("webcal://"):] if u.startswith("webcal://") else u
+
+
+def _tcp(i: dict) -> str:
+    if (i.get("type") or "kiss_tcp") not in ("kiss_tcp", "agwpe"):
+        return ""
+    return f'{str(i.get("host") or "").strip() or "127.0.0.1"}:{str(i.get("port") or "").strip()}'
+
+
+# listat: polku ja funktio, joka antaa alkion osoitteen ("" = ei osoitetta)
+ADDRESS_LISTS = ((("messaging", "feeds"), _url), (("nets", "sources"), _url), (("aprsrx", "radios"), _tcp))
 
 
 def normalize_lan(new: dict, old: dict) -> dict:
@@ -84,6 +106,33 @@ def has_secret_change(body: dict, qso_fields: list[str]) -> bool:
     return False
 
 
+def has_address_change(body: dict, cfg: dict) -> bool:
+    """Yrittääkö asetusmuutos vaihtaa osoitetta, johon ohjelma ottaa yhteyttä?
+    Listoissa (syötteet, kalenterit) sallitaan päälle/pois-kytkentä ja poisto, ei uusia osoitteita."""
+    def get(d, path):
+        for k in path:
+            if not isinstance(d, dict) or k not in d:
+                return None, False
+            d = d[k]
+        return d, True
+    for path in ADDRESS_FIELDS:
+        v, ok = get(body, path)
+        if ok and str(v if v is not None else "").strip() != str(get(cfg, path)[0] or "").strip():
+            if path == ("map_tiles",) and not str(v or "").strip() and not get(cfg, path)[0]:
+                continue
+            return True
+    for path, addr in ADDRESS_LISTS:
+        v, ok = get(body, path)
+        if not ok:
+            continue
+        old = {addr(i) for i in (get(cfg, path)[0] or []) if isinstance(i, dict)}
+        for i in v or []:
+            u = addr(i) if isinstance(i, dict) else ""
+            if u and u not in old:
+                return True
+    return False
+
+
 def host_allowed(host_header: str | None) -> bool:
     """DNS rebinding -suoja: hyväksytään vain IP-osoite, localhost ja koneen oma nimi (myös .local).
     Muuten haitallinen verkkosivu voisi ohjata oman nimensä osoitteeseen 127.0.0.1 ja lukea ohjelman tietoja."""
@@ -105,9 +154,9 @@ def host_allowed(host_header: str | None) -> bool:
 
 
 def lan_addresses() -> list[str]:
-    """Koneen IPv4-osoitteet lähiverkossa (ei 127.x)."""
+    """Koneen ensisijainen IPv4-osoite lähiverkossa (reitti ulos; ei lähetä mitään)."""
     out: list[str] = []
-    try:                                       # ensisijainen osoite: reitti ulos (ei lähetä mitään)
+    try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:
             s.connect(("192.0.2.1", 9))
@@ -118,6 +167,148 @@ def lan_addresses() -> list[str]:
         pass
     # (ei koneen nimen nimipalveluhakua: se voi kestää macOS:ssä kymmeniä sekunteja)
     return [ip for ip in out if not ip.startswith(("127.", "169.254.", "0."))]
+
+
+VIRTUAL_RE = re.compile(r"vethernet|virtualbox|vmware|vmnet|hyper-v|wsl|docker|^veth|^br-|^virbr|utun|^tun|^tap|^wg|"
+                        r"tailscale|zerotier|^zt|vboxnet|bridge|awdl|llw|nordlynx|openvpn|tap-windows|wireguard|vpn|"
+                        r"loopback|^anpi|^ap\d", re.I)
+_IF_CACHE: list = [0.0, []]
+
+
+def _run(cmd: list[str], timeout: float = 6) -> str:
+    import subprocess
+    kw = {}
+    if sys.platform == "win32":
+        kw["creationflags"] = 0x08000000                 # CREATE_NO_WINDOW: ei välähtävää konsoli-ikkunaa
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, **kw).stdout or ""
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def _parse_ifconfig(text: str) -> list[tuple[str, str]]:
+    """macOS/BSD ifconfig → [(sovitin, ipv4)]."""
+    out, cur = [], ""
+    for line in text.splitlines():
+        m = re.match(r"^([A-Za-z0-9_.-]+): flags=", line)
+        if m:
+            cur = m.group(1)
+            continue
+        m = re.match(r"^\s+inet (\d+\.\d+\.\d+\.\d+)", line)
+        if m and cur:
+            out.append((cur, m.group(1)))
+    return out
+
+
+def _parse_ip_addr(text: str) -> list[tuple[str, str]]:
+    """Linuxin `ip -o -4 addr show` → [(sovitin, ipv4)]."""
+    out = []
+    for line in text.splitlines():
+        m = re.match(r"^\d+:\s+([^\s:]+)\s+inet (\d+\.\d+\.\d+\.\d+)", line)
+        if m:
+            out.append((m.group(1), m.group(2)))
+    return out
+
+
+def _parse_win_json(text: str) -> list[tuple[str, str]]:
+    import json
+    try:
+        j = json.loads(text or "[]")
+    except ValueError:
+        return []
+    if isinstance(j, dict):
+        j = [j]
+    return [(str(i.get("InterfaceAlias") or ""), str(i.get("IPAddress") or "")) for i in j if isinstance(i, dict)]
+
+
+def interfaces(max_age: float = 60) -> list[dict]:
+    """Kaikki koneen lähiverkko-osoitteet sovittimen nimen kanssa: [{ip, name, virtual, primary}].
+    Ensisijainen (reitti ulos) ensin, virtuaali- ja VPN-sovittimet viimeisinä. Hidas (ulkoinen komento):
+    kutsu säikeessä; tulos pidetään muistissa minuutin."""
+    if time.time() - _IF_CACHE[0] < max_age and _IF_CACHE[1]:
+        return _IF_CACHE[1]
+    if sys.platform == "win32":
+        pairs = _parse_win_json(_run(["powershell", "-NoProfile", "-NonInteractive", "-Command",
+                                      "Get-NetIPAddress -AddressFamily IPv4 | Select-Object IPAddress,InterfaceAlias | ConvertTo-Json -Compress"]))
+    elif sys.platform == "darwin":
+        pairs = _parse_ifconfig(_run(["/sbin/ifconfig"]))
+    else:
+        pairs = _parse_ip_addr(_run(["ip", "-o", "-4", "addr", "show"])) or _parse_ifconfig(_run(["ifconfig"]))
+    prim = set(lan_addresses())
+    seen, out = set(), []
+    for name, ip in pairs:
+        if not ip or ip in seen or ip.startswith(("127.", "169.254.", "0.")):
+            continue
+        seen.add(ip)
+        cgnat = ip.startswith("100.") and 64 <= int(ip.split(".")[1]) <= 127      # esim. Tailscale
+        out.append({"ip": ip, "name": name, "virtual": bool(VIRTUAL_RE.search(name)) or cgnat, "primary": ip in prim})
+    for ip in prim - seen:
+        out.append({"ip": ip, "name": "", "virtual": False, "primary": True})
+    out.sort(key=lambda i: (not i["primary"], i["virtual"]))
+    _IF_CACHE[:] = [time.time(), out]
+    return out
+
+
+def local_hostname() -> str:
+    """Koneen nimi mDNS-muodossa (nimi.local), jos nimi kelpaa osoitteeksi; muuten ""."""
+    h = ""
+    if sys.platform == "darwin":
+        h = _run(["scutil", "--get", "LocalHostName"], 3).strip()
+    h = h or socket.gethostname().split(".")[0]
+    return f"{h.lower()}.local" if re.fullmatch(r"[A-Za-z0-9-]{1,63}", h or "") else ""
+
+
+# ---- Windowsin palomuuri ----
+FW_RULE = "Monitor for Amateur Radio (LAN {port})"
+
+
+def firewall_status(port: int, exe: str = "") -> dict:
+    """Windows: onko portille sallintasääntö, onko ohjelmalle estosääntöjä (syntyy, jos Windowsin kysymykseen
+    vastasi Peruuta) ja onko jokin verkkoyhteys Julkinen-profiilissa. Muilla järjestelmillä {"supported": False}."""
+    if sys.platform != "win32":
+        return {"supported": False}
+    import json
+    name = FW_RULE.format(port=int(port))
+    ps = ("$r = @(Get-NetFirewallRule -DisplayName '" + name + "' -ErrorAction SilentlyContinue | "
+          "Where-Object { $_.Enabled -eq 'True' }).Count; $b = 0; ")
+    if exe and "'" not in exe:
+        ps += ("$b = @(Get-NetFirewallApplicationFilter -Program '" + exe + "' -ErrorAction SilentlyContinue | "
+               "Get-NetFirewallRule | Where-Object { $_.Enabled -eq 'True' -and $_.Action -eq 'Block' "
+               "-and $_.Direction -eq 'Inbound' }).Count; ")
+    ps += ("$p = @(Get-NetConnectionProfile | ForEach-Object { @{n=$_.Name; c=[string]$_.NetworkCategory} }); "
+           "@{rule=$r; block=$b; profiles=$p} | ConvertTo-Json -Compress -Depth 3")
+    try:
+        j = json.loads(_run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps], 15) or "{}")
+    except ValueError:
+        j = {}
+    profs = j.get("profiles") or []
+    if isinstance(profs, dict):
+        profs = [profs]
+    return {"supported": True, "rule": bool(j.get("rule")), "blocked": int(j.get("block") or 0),
+            "public": [p.get("n") for p in profs if isinstance(p, dict) and str(p.get("c")) == "Public"]}
+
+
+def firewall_allow(port: int, exe: str) -> bool:
+    """Windows: lisää sallintasääntö yksityisiin verkkoihin (pyytää järjestelmänvalvojan oikeudet UAC-ikkunalla).
+    Palauttaa True, jos käyttäjä hyväksyi ja komento ajettiin."""
+    if sys.platform != "win32":
+        return False
+    port = int(port)
+    name = FW_RULE.format(port=port)
+    inner = (f"Remove-NetFirewallRule -DisplayName '{name}' -ErrorAction SilentlyContinue; "
+             f"New-NetFirewallRule -DisplayName '{name}' -Direction Inbound -Action Allow -Protocol TCP "
+             f"-LocalPort {port} -Profile Private")
+    if exe and "'" not in exe:
+        inner += f" -Program '{exe}'"
+        # Windowsin oma kysymys (Peruuta) tekee estosäännön, joka voittaa sallintasäännön: poistetaan se käytöstä
+        inner += (f"; Get-NetFirewallApplicationFilter -Program '{exe}' -ErrorAction SilentlyContinue | Get-NetFirewallRule | "
+                  "Where-Object { $_.Action -eq 'Block' -and $_.Direction -eq 'Inbound' } | Disable-NetFirewallRule")
+    import base64
+    enc = base64.b64encode(inner.encode("utf-16-le")).decode()
+    outer = ("try { Start-Process powershell -Verb RunAs -Wait -WindowStyle Hidden "
+             f"-ArgumentList '-NoProfile','-NonInteractive','-EncodedCommand','{enc}'; 'ok' }} catch {{ 'cancel' }}")
+    _IF_CACHE[0] = 0
+    return _run(["powershell", "-NoProfile", "-NonInteractive", "-Command", outer], 120).strip().endswith("ok")
 
 
 def qr_svg(text: str) -> str | None:
@@ -132,11 +323,42 @@ def qr_svg(text: str) -> str | None:
 
 
 class LanAccess:
-    """Istunnot ja kirjautumisyritykset (vain muistissa: uudelleenkäynnistys kirjaa etälaitteet ulos)."""
+    """Kirjautumiset. Istuntoeväste on allekirjoitettu (voimassaolo.satunnaisosa.HMAC), joten se säilyy
+    ohjelman uudelleenkäynnistyksen ja päivityksen yli. Avain johdetaan salasanan tiivisteestä ja
+    sukupolviarvosta: salasanan vaihto tai "kirjaa kaikki ulos" (uusi sukupolvi) mitätöi kaikki evästeet."""
 
-    def __init__(self):
-        self.sessions: dict[str, dict] = {}
+    def __init__(self, secret=lambda: ""):
+        self.secret = secret                   # → merkkijono (salasanan tiiviste + sukupolvi); "" = ei kirjautumista
+        self.active: dict[str, float] = {}     # satunnaisosa → viimeksi nähty (vain muistissa, laskuria varten)
+        self.revoked: set[str] = set()         # uloskirjatut evästeet tämän käynnistyksen aikana
         self.fails: dict[str, list] = {}       # ip → [epäonnistumiset, estetty asti]
+
+    @property
+    def sessions(self) -> dict:
+        now = time.time()
+        return {n: t for n, t in self.active.items() if now - t < SESSION_DAYS * 86400}
+
+    def _mac(self, body: str) -> str | None:
+        sec = self.secret()
+        if not sec:
+            return None
+        key = hashlib.sha256(("bmm-lan-session|" + sec).encode()).digest()
+        return hmac.new(key, body.encode(), hashlib.sha256).hexdigest()[:43]
+
+    def _make(self, nonce: str) -> str:
+        body = f"{int(time.time()) + SESSION_DAYS * 86400}.{nonce}"
+        return f"{body}.{self._mac(body)}"
+
+    def _parse(self, token: str | None):
+        """→ (voimassa asti, satunnaisosa) tai None."""
+        try:
+            exp, nonce, mac = (token or "").split(".")
+            want = self._mac(f"{exp}.{nonce}")
+            if not want or not hmac.compare_digest(mac, want) or int(exp) < time.time() or nonce in self.revoked:
+                return None
+            return int(exp), nonce
+        except (ValueError, TypeError):
+            return None
 
     def blocked_for(self, ip: str) -> float:
         f = self.fails.get(ip)
@@ -152,26 +374,37 @@ class LanAccess:
             if f[0] >= 5:                       # 5 virhettä → tauko 30 s, joka kaksinkertaistuu (max 15 min)
                 f[1] = time.time() + min(900, 30 * 2 ** (f[0] - 5))
             raise PermissionError(tr("Väärä salasana"))
+        if not self.secret():
+            raise PermissionError(tr("Aseta salasana"))
         self.fails.pop(ip, None)
-        token = secrets.token_urlsafe(32)
-        self.sessions[token] = {"t": time.time(), "last": time.time(), "ip": ip}
-        return token
+        nonce = secrets.token_urlsafe(18).replace(".", "_")
+        self.active[nonce] = time.time()
+        return self._make(nonce)
 
     def check(self, token: str | None) -> bool:
-        s = self.sessions.get(token or "")
-        if not s:
+        p = self._parse(token)
+        if not p:
             return False
-        if time.time() - s["last"] > SESSION_DAYS * 86400:
-            self.sessions.pop(token, None)
-            return False
-        s["last"] = time.time()
+        self.active[p[1]] = time.time()
         return True
 
+    def renew(self, token: str | None) -> str | None:
+        """Uusi eväste samalle laitteelle, kun puolet voimassaoloajasta on kulunut (liukuva 30 päivää)."""
+        p = self._parse(token)
+        if p and p[0] - time.time() < SESSION_DAYS * 86400 / 2:
+            return self._make(p[1])
+        return None
+
     def logout(self, token: str | None):
-        self.sessions.pop(token or "", None)
+        p = self._parse(token)
+        if p:
+            self.revoked.add(p[1])
+            self.active.pop(p[1], None)
 
     def logout_all(self):
-        self.sessions.clear()
+        """Kutsujan pitää myös vaihtaa sukupolvi (Monitor.lan_logout_all), jotta vanhat evästeet mitätöityvät."""
+        self.active.clear()
+        self.revoked.clear()
 
 
 LOGIN_HTML = """<!DOCTYPE html>

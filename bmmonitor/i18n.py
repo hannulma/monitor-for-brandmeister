@@ -289,6 +289,8 @@ EN: dict[str, str] = {
     "Virheellinen polku: {x}": "Invalid path: {x}",
     "Virheellinen lokaattori: {x}": "Invalid locator: {x}",
     "Virheellinen aika": "Invalid time",
+    "Palvelin- ja syöteosoitteita voi muuttaa vain ohjelman omalla koneella.": "Server and feed addresses can only be changed on the program's own computer.",
+    "Peruttu": "Cancelled",
     "Portin pitää olla välillä 1024–65535": "The port must be between 1024 and 65535",
     "Väärä salasana": "Wrong password",
     "Tämä toiminto on käytettävissä vain ohjelman omalla koneella.": "This function is only available on the program's own computer.",

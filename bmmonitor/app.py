@@ -16,6 +16,7 @@ import logging
 import os
 import random
 import re
+import secrets
 import socket
 import sys
 import time
@@ -250,12 +251,15 @@ class Monitor:
         self.hub.passcode_secret, moved_pass = secret_store.load_field(self.cfg["messaging"], "passcode", "aprs-passcode")
         self.cfg["lan"] = {**DEFAULT_LAN, **(self.cfg.get("lan") or {})}
         self.lan_hash, moved_lan = secret_store.load_field(self.cfg["lan"], "pw", "lan-password")
-        self.lan = LanAccess()
+        new_gen = not self.cfg["lan"].get("gen")
+        if new_gen:                                  # istuntoevästeiden sukupolvi (ks. lan.LanAccess)
+            self.cfg["lan"]["gen"] = secrets.token_hex(8)
+        self.lan = LanAccess(lambda: f'{self.lan_hash}|{self.cfg["lan"].get("gen", "")}' if self.lan_hash else "")
         self.lan_site = None
         self.lan_state = {"running": False, "error": None, "port": None}
         self.runner = None
         self.local_port = None
-        if moved_key or moved_pass or moved_lan:
+        if moved_key or moved_pass or moved_lan or new_gen:
             self.save_config()
         self.api = BMApi(lambda: self.bm_key)
         self.devmon = DeviceMonitor(self, self.api)
@@ -287,7 +291,7 @@ class Monitor:
                 "log": {**self.cfg["log"], **{f: "********" if self.qso.secrets.get(svc) else ""
                                                for svc, (f, _) in QSO_SECRETS.items()}},
                 "ais": {**self.cfg["ais"], "key": "********" if self.ais.key else ""},
-                "lan": {**self.cfg["lan"], "pw": "********" if self.lan_hash else ""},
+                "lan": {**{k: v for k, v in self.cfg["lan"].items() if k != "gen"}, "pw": "********" if self.lan_hash else ""},
                 "checkin": {**(self.cfg.get("checkin") or {}),
                             "sheet": {**((self.cfg.get("checkin") or {}).get("sheet") or {}), "key": "********"}}}
 
@@ -317,11 +321,27 @@ class Monitor:
             self.lan_state = {"running": False, "error": tr("Aseta salasana"), "port": None}
         self.dirty = True
 
-    def lan_public(self) -> dict:
+    def lan_logout_all(self, save: bool = True):
+        """Uusi evästesukupolvi: kaikki etälaitteiden kirjautumiset mitätöityvät (myös uudelleenkäynnistyksen yli)."""
+        self.cfg["lan"]["gen"] = secrets.token_hex(8)
+        self.lan.logout_all()
+        if save:
+            self.save_config()
+
+    async def lan_public(self) -> dict:
         port = self.cfg["lan"]["port"]
-        addrs = [f"http://{ip}:{port}/" for ip in lanmod.lan_addresses()] if self.lan_state.get("running") else []
-        return {**self.lan_state, "addresses": addrs, "has_password": bool(self.lan_hash),
-                "sessions": len(self.lan.sessions), "mode": self.cfg["lan"]["mode"]}
+        links = []
+        if self.lan_state.get("running"):
+            ifs = await asyncio.to_thread(lanmod.interfaces)
+            links = [{"url": f"http://{i['ip']}:{port}/", "name": i["name"], "virtual": i["virtual"],
+                      "primary": i["primary"]} for i in ifs]
+            host = await asyncio.to_thread(lanmod.local_hostname)
+            if host:
+                links.append({"url": f"http://{host}:{port}/", "name": "mDNS", "virtual": False, "primary": False,
+                              "mdns": True})
+        return {**self.lan_state, "addresses": [x["url"] for x in links], "links": links,
+                "has_password": bool(self.lan_hash), "sessions": len(self.lan.sessions), "mode": self.cfg["lan"]["mode"],
+                "platform": sys.platform}
 
     def save_config(self):
         self.cfg_path.write_text(json.dumps(self.cfg, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -1043,10 +1063,18 @@ def make_app(mon: Monitor) -> web.Application:
         path, method = request.path, request.method
         if path.startswith("/static/") or path in lanmod.REMOTE_PUBLIC:
             return await handler(request)
-        if not mon.lan.check(request.cookies.get(lanmod.COOKIE)):
+        token = request.cookies.get(lanmod.COOKIE)
+        if not mon.lan.check(token):
             if path == "/" and method == "GET":
                 raise web.HTTPFound("/login")
             return web.json_response({"ok": False, "error": tr("Kirjaudu sisään")}, status=401)
+        if path == "/" and method == "GET":         # sivun latauksessa eväste uusitaan (liukuva voimassaolo)
+            fresh = mon.lan.renew(token)
+            if fresh:
+                resp = await handler(request)
+                resp.set_cookie(lanmod.COOKIE, fresh, max_age=lanmod.SESSION_DAYS * 86400, httponly=True,
+                                samesite="Strict", path="/")
+                return resp
         if method not in ("GET", "HEAD"):
             origin = request.headers.get("Origin")
             if origin and origin.split("://", 1)[-1] != request.host:
@@ -1116,6 +1144,9 @@ def make_app(mon: Monitor) -> web.Application:
             if request.get(REMOTE_KEY) and (any(k in body for k in lanmod.CONFIG_DENY) or
                                           lanmod.has_secret_change(body, [f for f, _ in QSO_SECRETS.values()])):
                 return web.json_response({"ok": False, "error": tr("Avaimia ja salasanoja voi muuttaa vain ohjelman omalla koneella.")},
+                                         status=403)
+            if request.get(REMOTE_KEY) and lanmod.has_address_change(body, mon.cfg):
+                return web.json_response({"ok": False, "error": tr("Palvelin- ja syöteosoitteita voi muuttaa vain ohjelman omalla koneella.")},
                                          status=403)
             body.pop("lan", None)               # lähiverkkoasetukset vain /api/lan-kautta
             mon.update_config(body)
@@ -1688,13 +1719,15 @@ def make_app(mon: Monitor) -> web.Application:
         return web.json_response({"remote": bool(request.get(REMOTE_KEY)), "mode": mon.cfg["lan"]["mode"]})
 
     async def lan_get(_):
-        return web.json_response({"ok": True, **mon.lan_public()})
+        return web.json_response({"ok": True, **(await mon.lan_public())})
 
     async def lan_post(request):
         try:
             body = await request.json()
             pw = body.pop("password", None)
+            body.pop("gen", None)
             new = normalize_lan(body, mon.cfg["lan"])
+            rotate = False
             if pw is not None and pw != "********":
                 pw = str(pw)
                 if len(pw) < lanmod.MIN_PW:
@@ -1702,25 +1735,39 @@ def make_app(mon: Monitor) -> web.Application:
                 h = lanmod.hash_password(pw)
                 secret_store.save_field(new, "pw", "lan-password", h)
                 mon.lan_hash = h
-                mon.lan.logout_all()                    # salasanan vaihto kirjaa etälaitteet ulos
+                rotate = True                           # salasanan vaihto kirjaa etälaitteet ulos
             if new["enabled"] and not mon.lan_hash:
                 raise ValueError(tr("Aseta salasana"))
             if new["mode"] != mon.cfg["lan"]["mode"]:
-                mon.lan.logout_all()
+                rotate = True
             mon.cfg["lan"] = new
+            if rotate:
+                mon.lan_logout_all(save=False)
             mon.save_config()
             await mon.lan_apply()
-            return web.json_response({"ok": True, **mon.lan_public(), "config": mon.public_config()})
+            return web.json_response({"ok": True, **(await mon.lan_public()), "config": mon.public_config()})
         except ValueError as e:
             return web.json_response({"ok": False, "error": str(e)}, status=400)
 
     async def lan_logout_all(_):
-        mon.lan.logout_all()
-        return web.json_response({"ok": True, **mon.lan_public()})
+        mon.lan_logout_all()
+        return web.json_response({"ok": True, **(await mon.lan_public())})
+
+    def _fw_exe() -> str:
+        return sys.executable if getattr(sys, "frozen", False) else ""
+
+    async def lan_fw_get(_):
+        return web.json_response({"ok": True, **await asyncio.to_thread(lanmod.firewall_status, mon.cfg["lan"]["port"], _fw_exe())})
+
+    async def lan_fw_post(_):
+        ok = await asyncio.to_thread(lanmod.firewall_allow, mon.cfg["lan"]["port"], _fw_exe())
+        log.info("Lähiverkko: palomuurisääntö %s", "lisätty" if ok else "peruttu")
+        st = await asyncio.to_thread(lanmod.firewall_status, mon.cfg["lan"]["port"], _fw_exe())
+        return web.json_response({"ok": ok, **st, **({} if ok else {"error": tr("Peruttu")})})
 
     async def lan_qr(request):
         url = request.query.get("u", "")
-        ok = any(url == a for a in mon.lan_public()["addresses"])
+        ok = any(url == a for a in (await mon.lan_public())["addresses"])
         svg = lanmod.qr_svg(url) if ok else None
         if not svg:
             raise web.HTTPNotFound()
@@ -1734,6 +1781,8 @@ def make_app(mon: Monitor) -> web.Application:
     app.router.add_post("/api/lan", lan_post)
     app.router.add_post("/api/lan/logout_all", lan_logout_all)
     app.router.add_get("/api/lan/qr.svg", lan_qr)
+    app.router.add_get("/api/lan/firewall", lan_fw_get)
+    app.router.add_post("/api/lan/firewall", lan_fw_post)
     app.router.add_get("/", index)
     app.router.add_get("/ws", ws_handler)
     app.router.add_get("/api/snapshot", snapshot_http)

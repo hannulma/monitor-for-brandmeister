@@ -93,12 +93,21 @@ Talkgroups 1–90 are not supported by Hoseline.
 `bmmonitor/lan.py`. When enabled (and a password is set) the same aiohttp app gets a second `TCPSite` on
 `0.0.0.0:<port>` (default 8766); the local site on `127.0.0.1` is unchanged. A middleware tells the two apart by the
 local port of the connection. On the LAN port every path except `/login`, `/api/lan/login` and `/static/*` needs a
-session cookie (`bmm_lan`, random 256-bit token, HttpOnly, SameSite=Strict, 30 days, in memory only – a restart logs
-remote devices out). Login: PBKDF2-SHA256 (200 000 rounds, random salt) hash in the credential store; 5 wrong
+session cookie (`bmm_lan`, HttpOnly, SameSite=Strict). The cookie is `expiry.nonce.HMAC-SHA256`, keyed from the
+password hash and a random generation value in the config, so it survives restarts and updates; it is renewed on page
+load once half of its 30 days have passed. *Log out remote devices* and mode changes rotate the generation; a password
+change changes the hash – both invalidate every cookie. Single logouts are revoked in memory. Login: PBKDF2-SHA256 (200 000 rounds, random salt) hash in the credential store; 5 wrong
 attempts per IP → 30 s block doubling up to 15 min. Non-GET requests with a foreign `Origin` are rejected. Always
 denied remotely: shutdown, update install, window show, feedback bundle/send, `/api/lan` changes, config keys `lan`
 and `ui`, any key/password field (BM API key, APRS passcode, log service keys, aisstream.io key) and connecting or
-disconnecting the check-in sheet. *View only* additionally rejects every non-GET request except logout. QR codes
+disconnecting the check-in sheet, feed preview, firewall endpoints, and any change to an address the program itself
+connects to (map tile URL, APRS-IS server/port, KISS/AGWPE host/port of the receiver and radios, new feed or net
+calendar URLs – enabling, disabling and removing existing ones is allowed), so a remote device can't make the program
+fetch from arbitrary hosts on the LAN. Addresses: `Get-NetIPAddress` (Windows), `ifconfig` (macOS), `ip -o -4 addr`
+(Linux), cached for a minute and run in a thread; adapter names matching virtual/VPN patterns or CGNAT 100.64/10 are
+marked. Windows firewall: `Get-NetFirewallRule`/`Get-NetConnectionProfile` for status; *Allow* runs an elevated
+`New-NetFirewallRule` (TCP port, Private profile, program path) through `Start-Process -Verb RunAs` and disables
+inbound block rules for the program (created when the Windows prompt was cancelled). *View only* additionally rejects every non-GET request except logout. QR codes
 with `segno`.
 
 ## Open data services

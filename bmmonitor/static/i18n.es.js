@@ -6,6 +6,23 @@
  */
 window.I18N_LANGS = window.I18N_LANGS || {};
 window.I18N_LANGS.es = {
+    "First open the address in a browser on this computer. If the page doesn't open here either, another program is using the port – change the port.": "Abra primero la dirección en un navegador de este ordenador. Si la página tampoco se abre aquí, otro programa usa el puerto: cambie el puerto.",
+    "Remote device can't connect?": "¿El dispositivo remoto no puede conectarse?",
+    "Accept the Windows prompt…": "Acepte la pregunta de Windows…",
+    "If the page stays at “Connecting…”, reload it. The program writes the remote device's errors to its log (Settings → Feedback).": "Si la página se queda en «Conectando…», recárguela. El programa guarda los errores del dispositivo remoto en su registro (Ajustes → Comentarios).",
+    "Try the addresses in order. The first one is usually right; addresses of virtual and VPN adapters don't work from devices on your home network.": "Pruebe las direcciones en orden. La primera suele ser la correcta; las de adaptadores virtuales y VPN no funcionan desde los dispositivos de la red doméstica.",
+    "The devices must be on the same network. A guest network or the router's “AP isolation” stops devices from seeing each other.": "Los dispositivos deben estar en la misma red. Una red de invitados o el «aislamiento AP» del router impide que se vean entre sí.",
+    "The firewall has a rule blocking the program's incoming connections ({n}). The button disables it.": "El cortafuegos tiene una regla que bloquea las conexiones entrantes del programa ({n}). El botón la desactiva.",
+    "Server and feed addresses can only be changed on the program's own computer.": "Las direcciones de servidores y fuentes solo pueden cambiarse en el propio ordenador del programa.",
+    "Allow in firewall": "Permitir en el cortafuegos",
+    "Network connection {x} uses the Public profile: change it to Private in the Windows network settings.": "La conexión de red {x} usa el perfil Público: cámbielo a Privado en la configuración de red de Windows.",
+    "Windows: the network profile must be Private (Settings → Network & Internet → connection properties) and allowed in the firewall – use the button above.": "Windows: el perfil de red debe ser Privado (Configuración → Red e Internet → propiedades de la conexión) y estar permitido en el cortafuegos; use el botón de arriba.",
+    "Windows firewall: no allow rule for the port": "Cortafuegos de Windows: no hay regla que permita el puerto",
+    "Windows firewall: port allowed on private networks": "Cortafuegos de Windows: puerto permitido en redes privadas",
+    "computer name – works if the device supports .local names": "nombre del equipo: funciona si el dispositivo admite nombres .local",
+    "macOS: System Settings → Network → Firewall → Options: allow incoming connections for the program.": "macOS: Ajustes del Sistema → Red → Firewall → Opciones: permita las conexiones entrantes del programa.",
+    "recommended": "recomendada",
+    "virtual or VPN adapter": "adaptador virtual o VPN",
     "Set a password (at least 8 characters).": "Define una contraseña (al menos 8 caracteres).",
     "Keys and passwords can only be changed on the program's own computer.": "Las claves y contraseñas solo se pueden cambiar en el propio ordenador del programa.",
     "Not in use.": "No está en uso.",

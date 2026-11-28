@@ -295,11 +295,16 @@ try { var t = localStorage.getItem("bmm.theme") || "dark";
   #propMap .leaflet-control-attribution a { color: var(--accent); }
   #propMap .leaflet-bar a { background: var(--panel); color: var(--text); border-color: var(--line); }
   body.remote .localonly { display: none !important; }
+  body.remote .addr { opacity: .55; }
   body.viewonly section.cfg { display: none !important; }
   .warnnote { border-color: var(--warn, #f59f00); }
   .lanqr { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 10px; }
   .lanqr figure { margin: 0; text-align: center; font-size: 13px; }
   .lanqr img { width: 140px; height: 140px; background: #fff; border-radius: 6px; padding: 4px; }
+  .lanqr figure { max-width: 220px; } .lanqr figure.virt img { opacity: .45; }
+  .lanfw { margin-top: 10px; font-size: 13px; line-height: 1.7; } .lanfw button { margin-left: 8px; }
+  .lantrouble { margin-top: 14px; font-size: 13px; } .lantrouble summary { cursor: pointer; color: var(--accent, #4dabf7); }
+  .lantrouble ol { margin: 8px 0 0; padding-left: 20px; line-height: 1.55; }
   .propwrap { grid-template-columns: minmax(0, 1fr) 400px; }
   @media (max-width: 980px) { .propwrap { grid-template-columns: 1fr; } }
   .tropostrip { display: flex; gap: 2px; margin: 6px 0; }
@@ -644,7 +649,17 @@ try { var t = localStorage.getItem("bmm.theme") || "dark";
       <div class="frow svcsave"><button class="primary" id="btnLanSave">Tallenna</button>
         <button id="btnLanLogoutAll">Kirjaa etälaitteet ulos</button><span class="err" id="lanErr"></span></div>
       <div id="lanState"></div>
+      <div id="lanFw" class="lanfw" style="display:none"></div>
       <div class="lanqr" id="lanQr"></div>
+      <details class="lantrouble"><summary>Etälaite ei saa yhteyttä?</summary>
+        <ol>
+          <li>Avaa ensin osoite tällä koneella selaimeen. Jos sivu ei aukea täälläkään, portti on jo toisen ohjelman käytössä – vaihda portti.</li>
+          <li>Kokeile osoitteita järjestyksessä. Ensimmäinen on yleensä oikea; virtuaali- ja VPN-sovittimien osoitteet eivät toimi kotiverkon laitteilta.</li>
+          <li>Laitteiden pitää olla samassa verkossa. Vierasverkko tai reitittimen ”AP-eristys” estää laitteita näkemästä toisiaan.</li>
+          <li>Windows: verkkoprofiilin pitää olla Yksityinen (Asetukset → Verkko ja Internet → yhteyden ominaisuudet) ja palomuurissa sallittu – käytä yllä olevaa painiketta.</li>
+          <li>macOS: Järjestelmäasetukset → Verkko → Palomuuri → Asetukset: salli ohjelman saapuvat yhteydet.</li>
+          <li>Jos sivu jää tilaan ”Yhdistetään…”, lataa sivu uudelleen. Ohjelma tallentaa etälaitteen virheet lokiin (Asetukset → Palaute).</li>
+        </ol></details>
     </div>
   </section>
   <section class="cfg form" data-tab="asetukset" data-fold="cfg-program">
@@ -744,7 +759,7 @@ try { var t = localStorage.getItem("bmm.theme") || "dark";
         <div id="radioList"></div>
         <datalist id="serialList"></datalist>
         <div class="frow" style="align-items:center;margin-top:6px">
-          <button id="btnRadioAdd">+ Lisää radio</button>
+          <button id="btnRadioAdd" class="localonly">+ Lisää radio</button>
           <span class="hint" style="margin:0">Äänikortin kautta liitetylle radiolle käytä Graywolfia tai Direwolfia ja valitse tyypiksi KISS TCP tai AGWPE.</span>
         </div>
         <h3>Hiljentyneet digit ja iGatet</h3>
@@ -775,7 +790,7 @@ try { var t = localStorage.getItem("bmm.theme") || "dark";
         </div>
         <h3>Karttapohja</h3>
         <div class="frow">
-          <div class="fld" style="flex:2;min-width:280px"><label for="rxTiles">Karttatiilten osoite</label><input type="text" id="rxTiles" style="width:100%">
+          <div class="fld" style="flex:2;min-width:280px"><label for="rxTiles">Karttatiilten osoite</label><input type="text" id="rxTiles" class="addr" style="width:100%">
             <div class="hint">Oletus OpenStreetMap. Tiilet haetaan ohjelman kautta ja tallennetaan välimuistiin. Tyhjä = oletus.</div></div>
           <div class="fld" style="flex:1;min-width:200px"><label for="rxTilesAttr">Lähdemerkintä</label><input type="text" id="rxTilesAttr" style="width:100%"></div>
         </div>
@@ -838,7 +853,7 @@ try { var t = localStorage.getItem("bmm.theme") || "dark";
             <div class="hint">Ei samaa SSID:tä kuin Graywolfilla/iGatella</div></div>
           <div class="fld"><label for="mPass">Passcode</label><input type="password" id="mPass" style="width:120px">
             <div class="hint" id="mPassHint">tyhjä = lasketaan kutsusta</div></div>
-          <div class="fld"><label for="mServer">APRS-IS-palvelin</label><input type="text" id="mServer" style="width:200px"></div>
+          <div class="fld"><label for="mServer">APRS-IS-palvelin</label><input type="text" id="mServer" class="addr" style="width:200px"></div>
         </div>
         <h3>Vastaanottajat</h3>
         <div class="frow">
@@ -922,7 +937,7 @@ try { var t = localStorage.getItem("bmm.theme") || "dark";
         <h3>Syötteet (RSS, Atom tai JSON Feed)</h3>
         <div class="feedrow feedhead"><span class="fen-h">Käytössä</span><span class="fname">Etuliite</span><span class="furl">Osoite</span><span class="fcmd">Komento</span><span class="fbtns"></span></div>
         <div id="feedRows"></div>
-        <button id="btnAddFeed">+ Lisää syöte</button>
+        <button id="btnAddFeed" class="localonly">+ Lisää syöte</button>
         <ul class="hint hintlist">
           <li><b>Käytössä</b> – kun rasti on pois, syötettä ei seurata eikä siitä lähetetä viestejä.</li>
           <li><b>Etuliite</b> – lyhyt tunniste, joka näkyy viestin alussa, esim. <code>BM: otsikko</code>. Siitä tunnistat radion näytöltä, mistä syötteestä viesti on.</li>
@@ -1002,7 +1017,7 @@ try { var t = localStorage.getItem("bmm.theme") || "dark";
       <summary>Kalenterit, omat netit ja muistutus</summary>
       <h3>Kalenterit (ICS)</h3>
       <div id="netSrcRows"></div>
-      <button id="btnNetAddSrc">+ Lisää kalenteri</button>
+      <button id="btnNetAddSrc" class="localonly">+ Lisää kalenteri</button>
       <div class="hint">Esim. kerhon Google-kalenterin julkinen iCal-osoite. Puheryhmä luetaan tapahtuman tekstistä (esim. "TG 244" tai "(31424)").</div>
       <h3>Omat netit</h3>
       <div class="netown netownhead hint" style="margin:0"><span>Nimi</span><span>TG</span><span>Päivä</span><span>Klo</span><span>Min</span><span></span></div>
@@ -2284,9 +2299,9 @@ function feedRow(f) {
   d.className = "feedrow";
   d.innerHTML = `<label style="margin:0"><input type="checkbox" class="fen" ${f.enabled !== false ? "checked" : ""}></label>
     <input type="text" class="fname" placeholder="Etuliite" value="${esc(f.name || "")}">
-    <input type="text" class="furl" placeholder="https://…/feed/" value="${esc(f.url || "")}">
+    <input type="text" class="furl addr" placeholder="https://…/feed/" value="${esc(f.url || "")}">
     <input type="text" class="fcmd" placeholder="Komento" title="Radiokomento, esim. SAA" value="${esc(f.cmd || "")}">
-    <span class="fbtns"><button class="fprev">Esikatsele</button> <button class="fdel">Poista</button></span>`;
+    <span class="fbtns"><button class="fprev localonly">Esikatsele</button> <button class="fdel">Poista</button></span>`;
   d.querySelector(".fdel").onclick = () => d.remove();
   d.querySelector(".fprev").onclick = async () => {
     const url = d.querySelector(".furl").value.trim();
@@ -4136,7 +4151,7 @@ function netSrcRow(x) {
   const d = document.createElement("div"); d.className = "netsrc";
   d.innerHTML = `<input type="checkbox" class="nsen" ${x.enabled !== false ? "checked" : ""} title="${esc(T("Käytössä"))}">
     <input type="text" class="nsname" placeholder="${esc(T("Nimi"))}" value="${esc(x.name || "")}">
-    <input type="text" class="nsurl" placeholder="https://…/calendar.ics" value="${esc(x.url || "")}">
+    <input type="text" class="nsurl addr" placeholder="https://…/calendar.ics" value="${esc(x.url || "")}">
     <button class="nsdel">${esc(T("Poista"))}</button>`;
   d.querySelector(".nsdel").onclick = () => d.remove();
   return d;
@@ -4436,6 +4451,10 @@ fetch("/api/lan/me").then(r => r.json()).then(j => {
   document.body.classList.add("remote");
   $("lanLogout").style.display = "";
   document.querySelectorAll("input[type=password]").forEach(i => { i.disabled = true; i.title = T("Avaimia ja salasanoja voi muuttaa vain ohjelman omalla koneella."); });
+  // palvelin hylkää osoitemuutokset etälaitteelta; estetään kirjoitus jo kentässä
+  const addrMsg = T("Palvelin- ja syöteosoitteita voi muuttaa vain ohjelman omalla koneella.");
+  document.addEventListener("beforeinput", e => { if (e.target.closest && e.target.closest(".addr")) { e.preventDefault(); e.target.title = addrMsg; } }, true);
+  document.addEventListener("focusin", e => { if (e.target.closest && e.target.closest(".addr")) e.target.title = addrMsg; }, true);
   if (j.mode === "view") { document.body.classList.add("viewonly"); $("lanLogout").textContent = T("Vain katselu") + " · " + T("Kirjaudu ulos"); }
 }).catch(() => {});
 $("lanLogout").onclick = async e => { e.preventDefault(); await fetch("/api/lan/logout", {method: "POST"}); location.href = "/login"; };
@@ -4447,10 +4466,35 @@ function renderLan(j) {
   else if (j.error) h = `<span class="bad">${esc(j.error)}</span>`;
   else h = `<span class="muted">${esc(T("Ei käytössä."))}</span>`;
   $("lanState").innerHTML = h;
-  $("lanQr").innerHTML = (j.addresses || []).map(a => `<figure><img src="/api/lan/qr.svg?u=${encodeURIComponent(a)}" alt="QR">`
-    + `<figcaption><a href="${esc(a)}" target="_blank" rel="noopener">${esc(a)}</a></figcaption></figure>`).join("");
+  const links = j.links || (j.addresses || []).map(u => ({url: u}));
+  $("lanQr").innerHTML = links.map(a => `<figure class="${a.virtual ? "virt" : ""}"><img src="/api/lan/qr.svg?u=${encodeURIComponent(a.url)}" alt="QR">`
+    + `<figcaption><a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.url)}</a>`
+    + (a.name ? `<br><span class="muted">${esc(a.mdns ? T("koneen nimi – toimii, jos laite tukee .local-nimiä") : a.name)}</span>` : "")
+    + (a.primary ? ` <span class="ok">${esc(T("suositeltu"))}</span>` : "")
+    + (a.virtual ? ` <span class="muted">· ${esc(T("virtuaali- tai VPN-sovitin"))}</span>` : "")
+    + `</figcaption></figure>`).join("");
+  if (j.running && j.platform === "win32") loadLanFw(); else $("lanFw").style.display = "none";
   $("lanPwHint").textContent = j.has_password ? T("Salasana on asetettu. Jätä kentät tyhjiksi, jos et halua vaihtaa sitä.")
     : T("Aseta salasana (vähintään 8 merkkiä).");
+}
+function renderLanFw(f) {
+  const el = $("lanFw");
+  if (!f || !f.supported) { el.style.display = "none"; return; }
+  let h = f.rule ? `<span class="ok">● ${esc(T("Windowsin palomuuri: portti sallittu yksityisissä verkoissa"))}</span>`
+    : `<span class="bad">● ${esc(T("Windowsin palomuuri: portille ei ole sallintasääntöä"))}</span>`;
+  if (f.blocked) h += `<br><span class="bad">${esc(T("Palomuurissa on ohjelman saapuvat yhteydet estävä sääntö ({n} kpl). Painike poistaa sen käytöstä.", {n: f.blocked}))}</span>`;
+  if ((f.public || []).length) h += `<br><span class="bad">${esc(T("Verkkoyhteys {x} on Julkinen-profiilissa: vaihda se Yksityiseksi Windowsin verkkoasetuksista.", {x: f.public.join(", ")}))}</span>`;
+  if (!f.rule || f.blocked) h += ` <button id="btnLanFw">${esc(T("Salli palomuurissa"))}</button>`;
+  el.innerHTML = h; el.style.display = "";
+  const b = $("btnLanFw");
+  if (b) b.onclick = async () => {
+    b.disabled = true; b.textContent = T("Hyväksy Windowsin kysymys…");
+    try { const j = await (await fetch("/api/lan/firewall", {method: "POST"})).json(); renderLanFw(j); if (!j.ok) $("lanErr").textContent = j.error || ""; }
+    catch (e) { b.disabled = false; }
+  };
+}
+async function loadLanFw() {
+  try { renderLanFw(await (await fetch("/api/lan/firewall")).json()); } catch (e) { /* ei tietoa */ }
 }
 async function fillLan() {
   const c = S.config.lan || {};
@@ -4730,8 +4774,8 @@ function renderRadios() {
     const opts = RADIO_TYPES.map(([v, t]) => `<option value="${v}"${v === r.type ? " selected" : ""}>${esc(T(t))}</option>`).join("");
     let conn = "";
     if (r.type === "kiss_tcp" || r.type === "agwpe")
-      conn = `<div class="fld"><label>${esc(T("Palvelin"))}</label><input type="text" data-k="host" value="${esc(r.host || "127.0.0.1")}" style="width:150px"></div>
-        <div class="fld"><label>${esc(T("Portti"))}</label><input type="number" data-k="port" min="1" max="65535" value="${esc(r.port || RADIO_PORTS[r.type])}" style="width:90px"></div>`;
+      conn = `<div class="fld"><label>${esc(T("Palvelin"))}</label><input type="text" class="addr" data-k="host" value="${esc(r.host || "127.0.0.1")}" style="width:150px"></div>
+        <div class="fld"><label>${esc(T("Portti"))}</label><input type="number" class="addr" data-k="port" min="1" max="65535" value="${esc(r.port || RADIO_PORTS[r.type])}" style="width:90px"></div>`;
     else if (["kiss_serial", "kenwood", "kpc3"].includes(r.type))
       conn = `<div class="fld"><label>${esc(T("Sarjaportti"))}</label><input type="text" data-k="serial" list="serialList" value="${esc(r.serial || "")}" placeholder="COM5 / /dev/tty.usbmodem…" style="width:200px"></div>
         <div class="fld"><label>${esc(T("Nopeus"))}</label><select data-k="baud">${BAUDS.map(b => `<option${b === (+r.baud || 9600) ? " selected" : ""}>${b}</option>`).join("")}</select></div>

@@ -5,6 +5,8 @@ Si une entrée manque, l'anglais est utilisé.
 """
 
 FR: dict[str, str] = {
+    "Server and feed addresses can only be changed on the program's own computer.": "Les adresses de serveurs et de flux ne peuvent être modifiées que sur l'ordinateur du programme.",
+    "Cancelled": "Annulé",
     "The port must be between 1024 and 65535": "Le port doit être compris entre 1024 et 65535",
     "Wrong password": "Mot de passe incorrect",
     "This function is only available on the program's own computer.": "Cette fonction n'est disponible que sur l'ordinateur du programme.",

@@ -6,6 +6,23 @@
  */
 window.I18N_LANGS = window.I18N_LANGS || {};
 window.I18N_LANGS.fr = {
+    "First open the address in a browser on this computer. If the page doesn't open here either, another program is using the port – change the port.": "Ouvrez d'abord l'adresse dans un navigateur sur cet ordinateur. Si la page ne s'ouvre pas ici non plus, un autre programme utilise le port – changez de port.",
+    "Remote device can't connect?": "L'appareil distant ne parvient pas à se connecter ?",
+    "Accept the Windows prompt…": "Acceptez la demande de Windows…",
+    "If the page stays at “Connecting…”, reload it. The program writes the remote device's errors to its log (Settings → Feedback).": "Si la page reste sur « Connexion… », rechargez-la. Le programme enregistre les erreurs de l'appareil distant dans son journal (Paramètres → Retour).",
+    "Try the addresses in order. The first one is usually right; addresses of virtual and VPN adapters don't work from devices on your home network.": "Essayez les adresses dans l'ordre. La première est généralement la bonne ; celles des adaptateurs virtuels et VPN ne fonctionnent pas depuis les appareils du réseau domestique.",
+    "The devices must be on the same network. A guest network or the router's “AP isolation” stops devices from seeing each other.": "Les appareils doivent être sur le même réseau. Un réseau invité ou l'« isolation AP » du routeur les empêche de se voir.",
+    "The firewall has a rule blocking the program's incoming connections ({n}). The button disables it.": "Le pare-feu contient une règle bloquant les connexions entrantes du programme ({n}). Le bouton la désactive.",
+    "Server and feed addresses can only be changed on the program's own computer.": "Les adresses de serveurs et de flux ne peuvent être modifiées que sur l'ordinateur du programme.",
+    "Allow in firewall": "Autoriser dans le pare-feu",
+    "Network connection {x} uses the Public profile: change it to Private in the Windows network settings.": "La connexion réseau {x} utilise le profil Public : passez-la en Privé dans les paramètres réseau de Windows.",
+    "Windows: the network profile must be Private (Settings → Network & Internet → connection properties) and allowed in the firewall – use the button above.": "Windows : le profil réseau doit être Privé (Paramètres → Réseau et Internet → propriétés de la connexion) et autorisé dans le pare-feu – utilisez le bouton ci-dessus.",
+    "Windows firewall: no allow rule for the port": "Pare-feu Windows : aucune règle n'autorise le port",
+    "Windows firewall: port allowed on private networks": "Pare-feu Windows : port autorisé sur les réseaux privés",
+    "computer name – works if the device supports .local names": "nom de l'ordinateur – fonctionne si l'appareil prend en charge les noms .local",
+    "macOS: System Settings → Network → Firewall → Options: allow incoming connections for the program.": "macOS : Réglages Système → Réseau → Coupe-feu → Options : autorisez les connexions entrantes du programme.",
+    "recommended": "recommandée",
+    "virtual or VPN adapter": "adaptateur virtuel ou VPN",
     "Set a password (at least 8 characters).": "Définissez un mot de passe (au moins 8 caractères).",
     "Keys and passwords can only be changed on the program's own computer.": "Les clés et mots de passe ne peuvent être modifiés que sur l'ordinateur du programme.",
     "Not in use.": "Non utilisé.",

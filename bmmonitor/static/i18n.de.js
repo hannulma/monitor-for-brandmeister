@@ -6,6 +6,23 @@
  */
 window.I18N_LANGS = window.I18N_LANGS || {};
 window.I18N_LANGS.de = {
+    "First open the address in a browser on this computer. If the page doesn't open here either, another program is using the port – change the port.": "Öffnen Sie die Adresse zuerst in einem Browser auf diesem Computer. Wenn die Seite auch hier nicht öffnet, belegt ein anderes Programm den Port – ändern Sie den Port.",
+    "Remote device can't connect?": "Entferntes Gerät kann keine Verbindung herstellen?",
+    "Accept the Windows prompt…": "Bestätigen Sie die Windows-Abfrage…",
+    "If the page stays at “Connecting…”, reload it. The program writes the remote device's errors to its log (Settings → Feedback).": "Wenn die Seite bei „Verbinde…“ hängen bleibt, laden Sie sie neu. Das Programm schreibt die Fehler des entfernten Geräts ins Protokoll (Einstellungen → Feedback).",
+    "Try the addresses in order. The first one is usually right; addresses of virtual and VPN adapters don't work from devices on your home network.": "Probieren Sie die Adressen der Reihe nach. Die erste ist meist richtig; Adressen virtueller und VPN-Adapter funktionieren nicht von Geräten im Heimnetz.",
+    "The devices must be on the same network. A guest network or the router's “AP isolation” stops devices from seeing each other.": "Die Geräte müssen im selben Netz sein. Ein Gastnetz oder die „AP-Isolation“ des Routers verhindert, dass sie sich sehen.",
+    "The firewall has a rule blocking the program's incoming connections ({n}). The button disables it.": "Die Firewall hat eine Regel, die eingehende Verbindungen des Programms blockiert ({n}). Die Schaltfläche deaktiviert sie.",
+    "Server and feed addresses can only be changed on the program's own computer.": "Server- und Feed-Adressen können nur auf dem Computer des Programms geändert werden.",
+    "Allow in firewall": "In Firewall zulassen",
+    "Network connection {x} uses the Public profile: change it to Private in the Windows network settings.": "Die Netzwerkverbindung {x} hat das Profil „Öffentlich“: ändern Sie es in den Windows-Netzwerkeinstellungen auf „Privat“.",
+    "Windows: the network profile must be Private (Settings → Network & Internet → connection properties) and allowed in the firewall – use the button above.": "Windows: Das Netzwerkprofil muss „Privat“ sein (Einstellungen → Netzwerk und Internet → Verbindungseigenschaften) und in der Firewall zugelassen – nutzen Sie die Schaltfläche oben.",
+    "Windows firewall: no allow rule for the port": "Windows-Firewall: keine Zulassungsregel für den Port",
+    "Windows firewall: port allowed on private networks": "Windows-Firewall: Port in privaten Netzwerken zugelassen",
+    "computer name – works if the device supports .local names": "Computername – funktioniert, wenn das Gerät .local-Namen unterstützt",
+    "macOS: System Settings → Network → Firewall → Options: allow incoming connections for the program.": "macOS: Systemeinstellungen → Netzwerk → Firewall → Optionen: eingehende Verbindungen für das Programm erlauben.",
+    "recommended": "empfohlen",
+    "virtual or VPN adapter": "virtueller oder VPN-Adapter",
     "Set a password (at least 8 characters).": "Lege ein Passwort fest (mindestens 8 Zeichen).",
     "Keys and passwords can only be changed on the program's own computer.": "Schlüssel und Passwörter können nur auf dem eigenen Rechner des Programms geändert werden.",
     "Not in use.": "Nicht in Verwendung.",
