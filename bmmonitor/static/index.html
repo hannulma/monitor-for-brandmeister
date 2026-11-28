@@ -4,6 +4,30 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Monitor for Amateur Radio</title>
+<script>/* Vianetsintä (ES5, ennen muita skriptejä): selaimen virheet ja käynnistyksen eteneminen ohjelman lokiin.
+   Näin myös jäsennysvirhe myöhemmässä skriptissä (esim. tabletin selaimessa) näkyy lokissa. */
+(function () {
+  var sent = 0;
+  window.bmmBoot = function (msg) {
+    if (sent++ > 40) return;
+    try {
+      var x = new XMLHttpRequest();
+      x.open("POST", "/api/clientlog", true);
+      x.setRequestHeader("Content-Type", "application/json");
+      x.send(JSON.stringify({msg: String(msg).slice(0, 500)}));
+    } catch (e) { /* ei lokia */ }
+  };
+  window.onerror = function (msg, src, line, col, err) {
+    window.bmmBoot("JS-virhe: " + msg + " (" + (src || "").replace(location.origin, "") + ":" + line + ":" + col + ") "
+      + (err && err.stack ? String(err.stack).slice(0, 200) : "") + " | " + navigator.userAgent);
+  };
+  if (location.hostname !== "127.0.0.1" && location.hostname !== "localhost") {
+    setTimeout(function () {
+      if (!window.bmmStarted) window.bmmBoot("Sivun skripti ei käynnistynyt 6 s:ssa (vaihe: " + (window.bmmStage || "ei alkanut") + ") | " + navigator.userAgent);
+    }, 6000);
+  }
+})();
+</script>
 <script>/* teema heti, ettei sivu välähdä väärän värisenä */
 try { var t = localStorage.getItem("bmm.theme") || "dark";
   if (t === "auto") t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
@@ -2013,6 +2037,7 @@ try { var t = localStorage.getItem("bmm.theme") || "dark";
 <script src="/static/player.js"></script>
 
 <script>
+window.bmmStage = "pääskripti alkoi";
 const ICON_PLAY = '<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4z"/></svg>';
 const ICON_STOP = '<svg viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>';
 const ICON_TRI = '<svg viewBox="0 0 24 24"><path d="M7 5v14l12-7z"/></svg>';
@@ -2874,6 +2899,7 @@ function renderUpdate() {
   if (u.error && !u.busy) h += `<div class="bad" style="margin-top:6px">${esc(u.error)}</div>`;
   if ($("updBox").dataset.html !== h) { $("updBox").innerHTML = h; $("updBox").dataset.html = h; }
 }
+window.bmmStarted = true; window.bmmStage = "yhteys";
 let firstSnapshot = true, quitting = false, bootVersion = null;
 // Selaimen virheet ja yhteystapahtumat ohjelman lokiin (vianetsintä esim. tabletilla)
 function clientLog(msg) {
