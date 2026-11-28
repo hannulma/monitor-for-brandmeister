@@ -96,13 +96,7 @@ def lan_addresses() -> list[str]:
             s.close()
     except OSError:
         pass
-    try:
-        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
-            ip = info[4][0]
-            if ip not in out:
-                out.append(ip)
-    except OSError:
-        pass
+    # (ei koneen nimen nimipalveluhakua: se voi kestää macOS:ssä kymmeniä sekunteja)
     return [ip for ip in out if not ip.startswith(("127.", "169.254.", "0."))]
 
 

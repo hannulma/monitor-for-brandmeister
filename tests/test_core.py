@@ -1542,12 +1542,17 @@ def test_qso_candidates_persist(tmp_path):
     assert "TG:244:OH9X:1" not in d4.cands and db.execute("SELECT COUNT(*) FROM candidates").fetchone()[0] == 0
 
 
-def test_lan_access():
+def test_lan_access(tmp_path, monkeypatch):
     """Selainkäyttö lähiverkossa: salasana, kirjautuminen, kielletyt toiminnot, Vain katselu, salaisuudet, väärät yritykset."""
     import aiohttp
     from aiohttp import web
     from bmmonitor import lan as L
-    from bmmonitor.app import Monitor, config_dir, make_app
+    from bmmonitor import secret_store
+    from bmmonitor.app import Monitor, make_app
+    store = {}                     # ei oikeaa salasanavarastoa (macOS:n avainnippu voi jäädä odottamaan CI:ssä)
+    monkeypatch.setattr(secret_store, "put", lambda n, v: store.__setitem__(n, v) or True)
+    monkeypatch.setattr(secret_store, "get", lambda n: store.get(n))
+    monkeypatch.setattr(secret_store, "delete", lambda n: store.pop(n, None))
     h = L.hash_password("salasana1", iters=1000)
     assert L.verify_password("salasana1", h) and not L.verify_password("väärä", h) and not L.verify_password("x", "roskaa")
     assert L.normalize_lan({"port": "9000", "mode": "view", "enabled": 1}, {})["port"] == 9000
@@ -1567,7 +1572,7 @@ def test_lan_access():
     assert "<svg" in (L.qr_svg("http://192.168.1.2:8766/") or "<svg")
 
     async def run():
-        mon = Monitor(config_dir() / "config.json")
+        mon = Monitor(tmp_path / "config.json")
         p1, p2 = _free_port(), _free_port()
         runner = web.AppRunner(make_app(mon))
         await runner.setup()
