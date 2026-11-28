@@ -1629,3 +1629,33 @@ def test_lan_access(tmp_path, monkeypatch):
         await runner.cleanup()
 
     asyncio.run(run())
+
+
+def test_lan_host_and_ws_chunks():
+    """DNS rebinding -suoja (Host-otsake) ja suuren tilan lähetys osissa."""
+    import socket as _s
+    from bmmonitor import lan as L
+    from bmmonitor import app as A
+    for ok in ("127.0.0.1:8765", "192.168.1.20:8766", "[::1]:8765", "localhost:8765", "localhost", _s.gethostname() + ":1", ""):
+        assert L.host_allowed(ok), ok
+    for bad in ("evil.example", "evil.example:8765", "127.0.0.1.nip.io:8765"):
+        assert not L.host_allowed(bad), bad
+    sent = []
+
+    class FakeWs:
+        async def send_str(self, m):
+            sent.append(m)
+    msg = json.dumps({"x": "ä" * 1000})
+    old = A.WS_CHUNK
+    try:
+        A.WS_CHUNK = 300
+        asyncio.run(A.send_ws(FakeWs(), msg))
+    finally:
+        A.WS_CHUNK = old
+    assert len(sent) > 1 and all(p.startswith("\x01") for p in sent)
+    parts = {}
+    for p in sent:
+        head, data = p[1:].split("|", 1)
+        _tag, i, n = head.split("/")
+        parts[int(i)] = data
+    assert "".join(parts[i] for i in range(int(n))) == msg

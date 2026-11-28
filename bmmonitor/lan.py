@@ -84,6 +84,26 @@ def has_secret_change(body: dict, qso_fields: list[str]) -> bool:
     return False
 
 
+def host_allowed(host_header: str | None) -> bool:
+    """DNS rebinding -suoja: hyväksytään vain IP-osoite, localhost ja koneen oma nimi (myös .local).
+    Muuten haitallinen verkkosivu voisi ohjata oman nimensä osoitteeseen 127.0.0.1 ja lukea ohjelman tietoja."""
+    import ipaddress
+    h = (host_header or "").strip().lower()
+    if not h:
+        return True                                     # HTTP/1.0 ilman Host-otsaketta (ei selaimilta)
+    if h.startswith("["):                               # [IPv6]:portti
+        h = h[1:h.find("]")] if "]" in h else h[1:]
+    elif h.count(":") == 1:
+        h = h.rsplit(":", 1)[0]
+    try:
+        ipaddress.ip_address(h)
+        return True
+    except ValueError:
+        pass
+    own = socket.gethostname().lower()
+    return h.rstrip(".") in {"localhost", own, own.split(".")[0], own.split(".")[0] + ".local", own + ".local"}
+
+
 def lan_addresses() -> list[str]:
     """Koneen IPv4-osoitteet lähiverkossa (ei 127.x)."""
     out: list[str] = []

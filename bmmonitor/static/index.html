@@ -2914,9 +2914,18 @@ function connect() {
     clientLog("WebSocket ei avautunut 8 s:ssa (tila " + ws.readyState + ") – siirrytään HTTP-hakuun. " + navigator.userAgent);
     pollMode = true; try { ws.close(); } catch (e) { /* */ } pollLoop();
   }, 8000);
+  let parts = null, partTag = "";
   ws.onmessage = ev => {
     if (!got) { got = true; wsOk = true; wsFails = 0; clearTimeout(guard); }
-    try { onSnapshot(ev.data); } catch (e) { clientLog("Tilan käsittely: " + e.message); throw e; }
+    let data = ev.data;
+    if (data.charCodeAt(0) === 1) {           // suuri tila osissa: "\x01tunniste/osa/osia|data"
+      const bar = data.indexOf("|"), [tag, i, n] = data.slice(1, bar).split("/");
+      if (tag !== partTag) { partTag = tag; parts = []; }
+      parts[+i] = data.slice(bar + 1);
+      if (parts.filter(x => x !== undefined).length < +n) return;
+      data = parts.join(""); parts = null; partTag = "";
+    }
+    try { onSnapshot(data); } catch (e) { clientLog("Tilan käsittely: " + e.message); throw e; }
   };
   ws.onclose = ev => {
     clearTimeout(guard);

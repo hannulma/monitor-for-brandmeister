@@ -786,9 +786,24 @@ class Monitor:
             msg = json.dumps(self.snapshot(), ensure_ascii=False, default=str)
             for ws in list(self.clients):
                 try:
-                    await ws.send_str(msg)
+                    await send_ws(ws, msg)
                 except Exception:  # noqa: BLE001
                     self.clients.discard(ws)
+
+
+WS_CHUNK = int(os.environ.get("BMM_WS_CHUNK", 256 * 1024))     # ympäristömuuttuja vain testaukseen
+
+
+async def send_ws(ws, msg: str):
+    """Suuri tila osissa: iOS/iPadOS Safarin WebSocket-toteutus ei välttämättä ota vastaan yli 1 Mt:n viestiä.
+    Osaviesti: "\x01<tunniste>/<osa>/<osia>|<data>"; selain kokoaa osat ennen JSONin jäsennystä."""
+    if len(msg) <= WS_CHUNK:
+        await ws.send_str(msg)
+        return
+    tag = random.randrange(1 << 30)
+    parts = [msg[i:i + WS_CHUNK] for i in range(0, len(msg), WS_CHUNK)]
+    for i, part in enumerate(parts):
+        await ws.send_str(f"\x01{tag}/{i}/{len(parts)}|{part}")
 
 
 def _iso(ts) -> str:
@@ -1020,6 +1035,9 @@ def make_app(mon: Monitor) -> web.Application:
         sock = request.transport.get_extra_info("sockname") if request.transport else None
         remote = bool(mon.lan_site is not None and sock and mon.local_port and sock[1] != mon.local_port)
         request[REMOTE_KEY] = remote
+        if not lanmod.host_allowed(request.headers.get("Host")):
+            log.warning("Pyyntö hylätty: tuntematon Host-nimi %r", request.headers.get("Host", "")[:80])
+            return web.Response(status=421, text="Misdirected request")
         if not remote:
             return await handler(request)
         path, method = request.path, request.method
@@ -1053,7 +1071,7 @@ def make_app(mon: Monitor) -> web.Application:
         await ws.prepare(request)
         mon.clients.add(ws)
         try:
-            await ws.send_str(json.dumps(mon.snapshot(), ensure_ascii=False, default=str))
+            await send_ws(ws, json.dumps(mon.snapshot(), ensure_ascii=False, default=str))
             async for _ in ws:
                 pass
         finally:
