@@ -262,31 +262,35 @@ def local_hostname() -> str:
 FW_RULE = "Monitor for Amateur Radio (LAN {port})"
 
 
+def _ps_str(x: str) -> str:
+    return "'" + str(x).replace("'", "''") + "'"
+
+
 def firewall_status(port: int, exe: str = "") -> dict:
     """Windows: onko portille sallintasääntö, onko ohjelmalle estosääntöjä (syntyy, jos Windowsin kysymykseen
-    vastasi Peruuta) ja onko jokin verkkoyhteys Julkinen-profiilissa. Muilla järjestelmillä {"supported": False}."""
+    vastasi Peruuta) ja onko jokin verkkoyhteys Julkinen-profiilissa. Muilla järjestelmillä {"supported": False}.
+    Säännöt luetaan COM-rajapinnasta HNetCfg.FwPolicy2: Get-NetFirewallRule vaatii joillakin koneilla
+    järjestelmänvalvojan oikeudet ("Käyttö estetty"), netsh:n tuloste taas on käännetty."""
     if sys.platform != "win32":
         return {"supported": False}
     import json
     name = FW_RULE.format(port=int(port))
-    ps = ("$r = @(Get-NetFirewallRule -DisplayName '" + name + "' -ErrorAction SilentlyContinue | "
-          "Where-Object { $_.Enabled -eq 'True' }).Count; $b = 0; ")
-    if exe and "'" not in exe:
-        ps += ("$b = @(Get-NetFirewallApplicationFilter -Program '" + exe + "' -ErrorAction SilentlyContinue | "
-               "Get-NetFirewallRule | Where-Object { $_.Enabled -eq 'True' -and $_.Action -eq 'Block' "
-               "-and $_.Direction -eq 'Inbound' }).Count; ")
-    ps += ("$p = @(Get-NetConnectionProfile | ForEach-Object { @{n=$_.Name; c=[string]$_.NetworkCategory} }); "
-           "@{rule=$r; block=$b; profiles=$p} | ConvertTo-Json -Compress -Depth 3")
-    raw = _run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps], 15)
+    ps = ("$fw = New-Object -ComObject HNetCfg.FwPolicy2; $all = @($fw.Rules); "
+          f"$r = @($all | Where-Object {{ $_.Name -eq {_ps_str(name)} -and $_.Enabled -and $_.Action -eq 1 }}).Count; "
+          f"$b = @($all | Where-Object {{ $_.ApplicationName -and $_.ApplicationName -eq {_ps_str(exe or '-')} "
+          "-and $_.Direction -eq 1 -and $_.Action -eq 0 -and $_.Enabled }).Count; "
+          "$p = @(Get-NetConnectionProfile -ErrorAction SilentlyContinue | ForEach-Object { @{n=$_.Name; c=[string]$_.NetworkCategory} }); "
+          "@{rule=$r; block=$b; profiles=$p} | ConvertTo-Json -Compress -Depth 3")
+    raw = _run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps], 20)
     try:
         j = json.loads(raw or "{}")
     except ValueError:
         return {"supported": True, "rule": False, "blocked": 0, "public": [], "error": "status: " + (raw or "")[:300]}
+    if not raw.strip():
+        return {"supported": True, "rule": False, "blocked": 0, "public": [], "error": "status: powershell no output"}
     profs = j.get("profiles") or []
     if isinstance(profs, dict):
         profs = [profs]
-    if not raw.strip():
-        return {"supported": True, "rule": False, "blocked": 0, "public": [], "error": "status: powershell no output"}
     return {"supported": True, "rule": bool(j.get("rule")), "blocked": int(j.get("block") or 0),
             "public": [p.get("n") for p in profs if isinstance(p, dict) and str(p.get("c")) == "Public"]}
 
@@ -309,11 +313,11 @@ def firewall_allow(port: int, exe: str) -> tuple[bool, str]:
     body = (f"Remove-NetFirewallRule -DisplayName '{name}' -ErrorAction SilentlyContinue; "
             f"$null = New-NetFirewallRule -DisplayName '{name}' -Direction Inbound -Action Allow -Protocol TCP "
             f"-LocalPort {port} -Profile Private -ErrorAction Stop")
-    if exe and "'" not in exe:
+    if exe:
         # Windowsin oma kysymys (Peruuta) tekee estosäännön, joka voittaa sallintasäännön: poistetaan se käytöstä
-        body += (f"; $n = @(Get-NetFirewallApplicationFilter -Program '{exe}' -ErrorAction SilentlyContinue | Get-NetFirewallRule | "
-                 "Where-Object { $_.Action -eq 'Block' -and $_.Direction -eq 'Inbound' -and $_.Enabled -eq 'True' }); "
-                 "$n | Disable-NetFirewallRule; $msg = 'OK blocks-disabled=' + $n.Count")
+        body += (f" -Program {_ps_str(exe)}; $n = 0; foreach ($x in @((New-Object -ComObject HNetCfg.FwPolicy2).Rules)) {{ "
+                 f"if ($x.ApplicationName -and $x.ApplicationName -eq {_ps_str(exe)} -and $x.Direction -eq 1 -and $x.Action -eq 0 "
+                 "-and $x.Enabled) { $x.Enabled = $false; $n++ } }; $msg = 'OK blocks-disabled=' + $n")
     else:
         body += "; $msg = 'OK'"
     q = out.replace("'", "''")
