@@ -12,7 +12,7 @@ sisäiset nimet käyttävät edelleen sitä, jotta päivitykset ja tallennetut a
 🇬🇧 [English README](README.md)
 
 > [!NOTE]
-> **Vakaa versio 0.17.0.** Uusimmat ominaisuudet tulevat ensin testiversioihin (beta), jotka voi ottaa käyttöön
+> **Vakaa versio 0.18.0.** Uusimmat ominaisuudet tulevat ensin testiversioihin (beta), jotka voi ottaa käyttöön
 > kohdasta *Ohjelma → Versio ja päivitykset*. Virheilmoitukset ja palaute:
 > [Issues](https://github.com/hannulma/monitor-for-amateur-radio/issues).
 
