@@ -69,7 +69,7 @@ Välilehdet on ryhmitelty ohuilla pystyviivoilla: **BrandMeister · Tilastot · 
   voi kuunnella yhtä aikaa; ryhmiä 1–90 ei voi kuunnella).
 - **Viimeisimmät puhelut:** 10, 25, 50 tai 100 viimeisintä, suodatettavissa puheryhmän mukaan. Käynnissä olevat lähetykset näkyvät
   listan ylimpinä LÄHETYS-merkillä ja kasvavalla kestolla; päättyessään ne siirtyvät tavallisiksi riveiksi.
-- **Kirjaa yhteys (QSO) lokiin:** kun sinä ja toinen asema vuorottelette samassa puheryhmässä (vuorojen väli enintään 3 min) tai
+- **Kirjaa yhteys (QSO) lokiin:** kun puhut, toinen asema vastaa ja puhut vielä uudelleen samassa puheryhmässä (oma–toinen–oma, vuorojen väli enintään 3 min; pelkkä check-in-netin kuittaus ei riitä) tai
   pidätte yksityispuhelun, yhteys näkyy ehdokkaana. *Lisää lokiin* avaa valmiiksi täytetyn lomakkeen (tila DMR); *Ohita* poistaa ehdokkaan.
   Ehdokkaat odottavat (myös ohjelman uudelleenkäynnistyksen yli), kunnes lisäät tai ohitat ne, kuitenkin enintään 7 päivää.
   Loki tallentuu oletuksena paikallisesti; lähetys QRZ.comiin, eQSL:ään ja HamQTH:hon on valinnainen.

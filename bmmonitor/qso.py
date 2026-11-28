@@ -1,7 +1,9 @@
 """Loki: yhteyksien (QSO) tunnistus BrandMeisterin puheluista, paikallinen loki ja QRZ Logbook -synkronointi.
 
-Tunnistus: kun oma kutsu ja toinen asema vuorottelevat samassa puheryhmässä (oma–toinen–oma tai
-toinen–oma–toinen) ja vuorojen väli on enintään QSO_GAP sekuntia, syntyy yhteysehdokas. Ehdokas päättyy,
+Tunnistus: kun oma kutsu ja toinen asema vuorottelevat samassa puheryhmässä niin, että oman vuoron jälkeen
+toinen vastaa ja sinä puhut vielä uudelleen (oma–toinen–oma, siis myös toinen–oma–toinen–oma), ja vuorojen väli
+on enintään QSO_GAP sekuntia, syntyy yhteysehdokas. Pelkkä toinen–oma–toinen ei riitä: check-in-netissä
+nettijohtaja kutsuu, asema kuittautuu ja nettijohtaja kuittaa – se ei ole yhteys. Ehdokas päättyy,
 kun QSO_QUIET sekuntia on hiljaista. Yksityispuhelu omaan kutsuun tai omasta kutsusta on aina ehdokas.
 Käyttäjä lisää ehdokkaan lokiin (tai ohittaa sen); lokiin lisätty yhteys lähetetään valittuihin palveluihin
 (QRZ Logbook, eQSL, HamQTH). BrandMeisterin kautta pidetyt yhteydet ovat internet-avusteisia (ADIF PROP_MODE=INTERNET);
@@ -311,8 +313,9 @@ class QsoDetector:
             if chain[0]["start"] - t["stop"] > QSO_GAP:
                 break
             chain.insert(0, t)
-        switches = sum(1 for a, b in zip(chain, chain[1:]) if a["own"] != b["own"])
-        if switches < 2:
+        # vuorot lohkoiksi (peräkkäiset saman puolen lähetykset yhdeksi); vaaditaan oma–toinen–oma
+        blocks = [chain[0]["own"]] + [b["own"] for a, b in zip(chain, chain[1:]) if a["own"] != b["own"]]
+        if not any(blocks[i] and not blocks[i + 1] and blocks[i + 2] for i in range(len(blocks) - 2)):
             return
         info = next((t for t in reversed(chain) if not t["own"]), {})
         self._upsert(f"{k}:{other}:{int(chain[0]['start'])}", other, chain, private=False, other_info=info)

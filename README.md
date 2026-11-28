@@ -91,8 +91,8 @@ The tabs are grouped: **BrandMeister · Statistics · Friends · Devices · Chec
 
 ### Logs
 
-- **Contact log** – contacts (QSOs) are recognised from BrandMeister calls when you and another station take turns
-  on a talkgroup or have a private call; add them to the log with one click. Candidates wait (also across restarts)
+- **Contact log** – contacts (QSOs) are recognised from BrandMeister calls when you speak, another station answers and
+  you speak again on a talkgroup (a check-in net exchange alone doesn't count), or have a private call; add them to the log with one click. Candidates wait (also across restarts)
   until you add or skip them, for at most 7 days. Manual entries for any mode (SSB, CW, FM, FT8, D-STAR, C4FM, …;
   quick buttons plus all ADIF modes, RST defaults 59/599). Logs tab: search, filter by mode, edit, ADIF/CSV export.
   The log is stored locally; optional upload to **QRZ Logbook** (requires a QRZ subscription, XML level or higher),

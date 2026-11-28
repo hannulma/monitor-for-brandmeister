@@ -695,6 +695,14 @@ def test_qso_detector_and_log(tmp_path):
     assert {x["call"] for x in det.snapshot()} == {"OH2ABC"}
     ev("OH2BEA", t0 + 2060, tg=91)
     assert {x["call"] for x in det.snapshot()} == {"OH2ABC", "OH9AAA"}
+    # check-in-netti: nettijohtaja kutsuu, oma kuittautuminen, nettijohtaja kuittaa → ei yhteyttä
+    ev("OH6NET", t0 + 2500, tg=24400)
+    ev("OH2BEA", t0 + 2530, tg=24400)
+    ev("OH6NET", t0 + 2560, tg=24400)
+    ev("OH6NET", t0 + 2600, tg=24400)              # nettijohtaja jatkaa (sama puoli)
+    assert "OH6NET" not in {x["call"] for x in det.snapshot()}
+    ev("OH2BEA", t0 + 2630, tg=24400)              # toinen–oma–toinen–oma → ehdokas
+    assert "OH6NET" in {x["call"] for x in det.snapshot()}
     ev("OH2PRV", t0 + 3000, private_to="OH2BEA")     # yksityispuhelu omaan kutsuun = heti ehdokas
     prv = [x for x in det.snapshot() if x["call"] == "OH2PRV"][0]
     assert prv["private"] and prv["tg"] is None
