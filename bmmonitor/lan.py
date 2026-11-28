@@ -277,38 +277,65 @@ def firewall_status(port: int, exe: str = "") -> dict:
                "-and $_.Direction -eq 'Inbound' }).Count; ")
     ps += ("$p = @(Get-NetConnectionProfile | ForEach-Object { @{n=$_.Name; c=[string]$_.NetworkCategory} }); "
            "@{rule=$r; block=$b; profiles=$p} | ConvertTo-Json -Compress -Depth 3")
+    raw = _run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps], 15)
     try:
-        j = json.loads(_run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps], 15) or "{}")
+        j = json.loads(raw or "{}")
     except ValueError:
-        j = {}
+        return {"supported": True, "rule": False, "blocked": 0, "public": [], "error": "status: " + (raw or "")[:300]}
     profs = j.get("profiles") or []
     if isinstance(profs, dict):
         profs = [profs]
+    if not raw.strip():
+        return {"supported": True, "rule": False, "blocked": 0, "public": [], "error": "status: powershell no output"}
     return {"supported": True, "rule": bool(j.get("rule")), "blocked": int(j.get("block") or 0),
             "public": [p.get("n") for p in profs if isinstance(p, dict) and str(p.get("c")) == "Public"]}
 
 
-def firewall_allow(port: int, exe: str) -> bool:
+def firewall_allow(port: int, exe: str) -> tuple[bool, str]:
     """Windows: lisää sallintasääntö yksityisiin verkkoihin (pyytää järjestelmänvalvojan oikeudet UAC-ikkunalla).
-    Palauttaa True, jos käyttäjä hyväksyi ja komento ajettiin."""
+    → (onnistui, viesti). Korotetun PowerShellin tulos kirjoitetaan tiedostoon, jotta virhe näkyy lokissa."""
     if sys.platform != "win32":
-        return False
+        return False, "not windows"
+    import base64
+    import os
+    import tempfile
     port = int(port)
     name = FW_RULE.format(port=port)
-    inner = (f"Remove-NetFirewallRule -DisplayName '{name}' -ErrorAction SilentlyContinue; "
-             f"New-NetFirewallRule -DisplayName '{name}' -Direction Inbound -Action Allow -Protocol TCP "
-             f"-LocalPort {port} -Profile Private")
+    out = os.path.join(tempfile.gettempdir(), f"bmm-firewall-{os.getpid()}.txt")
+    try:
+        os.remove(out)
+    except OSError:
+        pass
+    body = (f"Remove-NetFirewallRule -DisplayName '{name}' -ErrorAction SilentlyContinue; "
+            f"$null = New-NetFirewallRule -DisplayName '{name}' -Direction Inbound -Action Allow -Protocol TCP "
+            f"-LocalPort {port} -Profile Private -ErrorAction Stop")
     if exe and "'" not in exe:
-        inner += f" -Program '{exe}'"
         # Windowsin oma kysymys (Peruuta) tekee estosäännön, joka voittaa sallintasäännön: poistetaan se käytöstä
-        inner += (f"; Get-NetFirewallApplicationFilter -Program '{exe}' -ErrorAction SilentlyContinue | Get-NetFirewallRule | "
-                  "Where-Object { $_.Action -eq 'Block' -and $_.Direction -eq 'Inbound' } | Disable-NetFirewallRule")
-    import base64
+        body += (f"; $n = @(Get-NetFirewallApplicationFilter -Program '{exe}' -ErrorAction SilentlyContinue | Get-NetFirewallRule | "
+                 "Where-Object { $_.Action -eq 'Block' -and $_.Direction -eq 'Inbound' -and $_.Enabled -eq 'True' }); "
+                 "$n | Disable-NetFirewallRule; $msg = 'OK blocks-disabled=' + $n.Count")
+    else:
+        body += "; $msg = 'OK'"
+    q = out.replace("'", "''")
+    inner = (f"try {{ {body}; $msg | Out-File -Encoding utf8 '{q}' }} "
+             f"catch {{ ('ERROR ' + $_.Exception.Message) | Out-File -Encoding utf8 '{q}' }}")
     enc = base64.b64encode(inner.encode("utf-16-le")).decode()
     outer = ("try { Start-Process powershell -Verb RunAs -Wait -WindowStyle Hidden "
-             f"-ArgumentList '-NoProfile','-NonInteractive','-EncodedCommand','{enc}'; 'ok' }} catch {{ 'cancel' }}")
+             f"-ArgumentList '-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-EncodedCommand','{enc}' -ErrorAction Stop; 'started' }} "
+             "catch { 'cancel ' + $_.Exception.Message }")
     _IF_CACHE[0] = 0
-    return _run(["powershell", "-NoProfile", "-NonInteractive", "-Command", outer], 120).strip().endswith("ok")
+    started = _run(["powershell", "-NoProfile", "-NonInteractive", "-Command", outer], 120).strip()
+    try:
+        with open(out, encoding="utf-8-sig") as f:
+            res = f.read().strip()
+        os.remove(out)
+    except OSError:
+        res = ""
+    if not started.endswith("started") and not res:
+        return False, started or "powershell: no output"
+    if not res:
+        return False, "elevated command wrote no result (" + started + ")"
+    return res.startswith("OK"), res
 
 
 def qr_svg(text: str) -> str | None:

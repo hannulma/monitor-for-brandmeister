@@ -1761,13 +1761,18 @@ def make_app(mon: Monitor) -> web.Application:
         return sys.executable if getattr(sys, "frozen", False) else ""
 
     async def lan_fw_get(_):
-        return web.json_response({"ok": True, **await asyncio.to_thread(lanmod.firewall_status, mon.cfg["lan"]["port"], _fw_exe())})
+        st = await asyncio.to_thread(lanmod.firewall_status, mon.cfg["lan"]["port"], _fw_exe())
+        if st.get("error"):
+            log.warning("Lähiverkko: palomuurin tila: %s", st["error"])
+        return web.json_response({"ok": True, **st})
 
     async def lan_fw_post(_):
-        ok = await asyncio.to_thread(lanmod.firewall_allow, mon.cfg["lan"]["port"], _fw_exe())
-        log.info("Lähiverkko: palomuurisääntö %s", "lisätty" if ok else "peruttu")
+        ok, msg = await asyncio.to_thread(lanmod.firewall_allow, mon.cfg["lan"]["port"], _fw_exe())
         st = await asyncio.to_thread(lanmod.firewall_status, mon.cfg["lan"]["port"], _fw_exe())
-        return web.json_response({"ok": ok, **st, **({} if ok else {"error": tr("Peruttu")})})
+        log.info("Lähiverkko: palomuurisääntö: %s; tila nyt %s (ohjelma %s)", msg, st, _fw_exe() or "-")
+        if ok and not st.get("rule"):
+            msg = tr("Sääntö lisättiin, mutta sitä ei löydy tarkistuksessa") + f" ({msg}; {st.get('error') or ''})"
+        return web.json_response({**st, "ok": ok, **({} if ok and st.get("rule") else {"error": msg})})
 
     async def lan_qr(request):
         url = request.query.get("u", "")

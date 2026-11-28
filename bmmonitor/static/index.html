@@ -4498,12 +4498,13 @@ function renderLanFw(f) {
     : `<span class="bad">● ${esc(T("Windowsin palomuuri: portille ei ole sallintasääntöä"))}</span>`;
   if (f.blocked) h += `<br><span class="bad">${esc(T("Palomuurissa on ohjelman saapuvat yhteydet estävä sääntö ({n} kpl). Painike poistaa sen käytöstä.", {n: f.blocked}))}</span>`;
   if ((f.public || []).length) h += `<br><span class="bad">${esc(T("Verkkoyhteys {x} on Julkinen-profiilissa: vaihda se Yksityiseksi Windowsin verkkoasetuksista.", {x: f.public.join(", ")}))}</span>`;
+  if (f.error) h += `<br><span class="muted">${esc(f.error)}</span>`;
   if (!f.rule || f.blocked) h += ` <button id="btnLanFw">${esc(T("Salli palomuurissa"))}</button>`;
   el.innerHTML = h; el.style.display = "";
   const b = $("btnLanFw");
   if (b) b.onclick = async () => {
     b.disabled = true; b.textContent = T("Hyväksy Windowsin kysymys…");
-    try { const j = await (await fetch("/api/lan/firewall", {method: "POST"})).json(); renderLanFw(j); if (!j.ok) $("lanErr").textContent = j.error || ""; }
+    try { const j = await (await fetch("/api/lan/firewall", {method: "POST"})).json(); renderLanFw(j); $("lanErr").textContent = j.error || ""; }
     catch (e) { b.disabled = false; }
   };
 }

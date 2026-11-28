@@ -5,6 +5,7 @@ Si une entrée manque, l'anglais est utilisé.
 """
 
 FR: dict[str, str] = {
+    "The rule was added but the check can't find it": "La règle a été ajoutée, mais la vérification ne la trouve pas",
     "Server and feed addresses can only be changed on the program's own computer.": "Les adresses de serveurs et de flux ne peuvent être modifiées que sur l'ordinateur du programme.",
     "Cancelled": "Annulé",
     "The port must be between 1024 and 65535": "Le port doit être compris entre 1024 et 65535",
