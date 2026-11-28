@@ -1099,8 +1099,18 @@ def make_app(mon: Monitor) -> web.Application:
     app = web.Application(middlewares=[lan_guard])
     app.on_response_prepare.append(no_stale_page)
 
+    index_cache: dict = {}
+
     async def index(_):
-        return web.FileResponse(STATIC_DIR / "index.html")
+        """Sivu muistista; skripti- ja tyylitiedostoihin versio (?v=…), jotta selain ei käytä vanhaa
+        (mahdollisesti rikki tullutta) kopiota välimuistista päivityksen jälkeen."""
+        f = STATIC_DIR / "index.html"
+        mt = f.stat().st_mtime
+        if index_cache.get("mt") != mt:
+            html = f.read_text(encoding="utf-8")
+            html = re.sub(r'((?:src|href)="/static/[^"?#]+\.(?:js|css))"', rf'\1?v={__version__}"', html)
+            index_cache.update(mt=mt, body=html.encode("utf-8"))
+        return web.Response(body=index_cache["body"], content_type="text/html", charset="utf-8")
 
     async def ws_handler(request):
         remote = request.get(REMOTE_KEY)

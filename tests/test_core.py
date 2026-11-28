@@ -1,5 +1,6 @@
 """Perustestit: ajetaan GitHub Actionsissa Windowsilla, macOS:llä ja Linuxilla (ei verkkoyhteyksiä)."""
 import asyncio
+import os
 import calendar
 import json
 import re
@@ -1705,3 +1706,70 @@ def test_lan_host_and_ws_chunks():
         _tag, i, n = head.split("/")
         parts[int(i)] = data
     assert "".join(parts[i] for i in range(int(n))) == msg
+
+
+def test_static_files_intact_to_slow_client(tmp_path):
+    """Windowsin SelectorEventLoopissa asyncion sendfile-varatie sotki hitaalle vastaanottajalle (iPad Wi-Fi:ssä)
+    lähetetyt tiedostot. Ohjelma käyttää aiohttp:n omaa lähetystä (AIOHTTP_NOSENDFILE); testi pakottaa varatien
+    ja pienen lähetyspuskurin kuten Windowsissa."""
+    import socket as _s
+    import threading
+    from asyncio import exceptions
+    from aiohttp import web, web_fileresponse
+    import bmmonitor  # noqa: F401
+    from bmmonitor.app import Monitor, make_app
+    assert web_fileresponse.NOSENDFILE
+    data = os.urandom(300_000)
+    (tmp_path / "f.bin").write_bytes(data)
+
+    async def h(req):
+        req.transport.get_extra_info("socket").setsockopt(_s.SOL_SOCKET, _s.SO_SNDBUF, 4096)
+        return web.FileResponse(tmp_path / "f.bin")
+
+    def client(port, path, out):
+        s = _s.socket()
+        s.setsockopt(_s.SOL_SOCKET, _s.SO_RCVBUF, 4096)
+        s.connect(("127.0.0.1", port))
+        s.sendall(f"GET {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n".encode())
+        buf = b""
+        while True:
+            time.sleep(0.001)
+            c = s.recv(4096)
+            if not c:
+                break
+            buf += c
+        out.append(buf.split(b"\r\n\r\n", 1)[1])
+
+    async def run():
+        loop = asyncio.get_running_loop()
+
+        async def no_native(*a, **k):
+            raise exceptions.SendfileNotAvailableError("windows")
+        loop._sendfile_native = no_native
+        app = web.Application()
+        app.router.add_get("/", h)
+        r = web.AppRunner(app)
+        await r.setup()
+        port = _free_port()
+        await web.TCPSite(r, "127.0.0.1", port).start()
+        out = []
+        t = threading.Thread(target=client, args=(port, "/", out))
+        t.start()
+        while t.is_alive():
+            await asyncio.sleep(0.02)
+        await r.cleanup()
+        assert out[0] == data
+        # sivu: skripteissä versio, jottei vanhaa kopiota käytetä välimuistista
+        mon = Monitor(tmp_path / "config.json")
+        r = web.AppRunner(make_app(mon))
+        await r.setup()
+        port = _free_port()
+        await web.TCPSite(r, "127.0.0.1", port).start()
+        async with aiohttp.ClientSession() as s:
+            html = await (await s.get(f"http://127.0.0.1:{port}/")).text()
+        await r.cleanup()
+        from bmmonitor import __version__
+        assert f'src="/static/i18n.js?v={__version__}"' in html and f'leaflet.css?v={__version__}"' in html
+
+    import aiohttp
+    asyncio.run(run())
