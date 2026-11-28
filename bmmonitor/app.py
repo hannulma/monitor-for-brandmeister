@@ -54,6 +54,10 @@ HISTORY_ROWS = 500   # BM palauttaa enintään n. 500 viimeisintä tapahtumaa
 TG_NAMES_URL = "https://api.brandmeister.network/v2/talkgroup"
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
+# Windowsissa mimetypes lukee tyypit rekisteristä, jossa .js voi olla esim. text/plain → varmistetaan oikeat tyypit
+import mimetypes  # noqa: E402
+for _ext, _type in ((".js", "text/javascript"), (".css", "text/css"), (".svg", "image/svg+xml"), (".png", "image/png")):
+    mimetypes.add_type(_type, _ext)
 MAX_CALLS = 500
 MAX_DATA = 500
 STALE_ACTIVE_SEC = 300          # aktiivinen sessio ilman Stopia -> unohdetaan

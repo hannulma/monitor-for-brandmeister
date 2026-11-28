@@ -23,9 +23,23 @@
   };
   if (location.hostname !== "127.0.0.1" && location.hostname !== "localhost") {
     setTimeout(function () {
-      if (!window.bmmStarted) window.bmmBoot("Sivun skripti ei käynnistynyt 6 s:ssa (vaihe: " + (window.bmmStage || "ei alkanut") + ") | " + navigator.userAgent);
+      if (window.bmmStarted) return;
+      var pend = [];                       // skriptit, joiden lataus ei ole valmis (palvelin ei vastannut loppuun)
+      try {
+        var done = {}, ents = performance.getEntriesByType("resource");
+        for (var i = 0; i < ents.length; i++) if (ents[i].responseEnd > 0) done[ents[i].name.replace(location.origin, "")] = Math.round(ents[i].duration);
+        var ss = document.getElementsByTagName("script");
+        for (var j = 0; j < ss.length; j++) {
+          var src = ss[j].getAttribute("src");
+          if (src) pend.push(src + (src in done ? " ok " + done[src] + " ms" : " KESKEN"));
+        }
+      } catch (e) { pend.push("ei tietoa: " + e); }
+      window.bmmBoot("Sivun skripti ei käynnistynyt 6 s:ssa (vaihe: " + (window.bmmStage || "ei alkanut") + "; skriptit: "
+        + pend.join(", ") + ") | " + navigator.userAgent);
     }, 6000);
   }
+  window.bmmScriptFail = function (el) { window.bmmBoot("Skriptin lataus epäonnistui: " + el.getAttribute("src")); };
+  if (location.hostname !== "127.0.0.1" && location.hostname !== "localhost") window.bmmBoot("Sivu ladattu, skriptit alkavat | " + navigator.userAgent);
 })();
 </script>
 <script>/* teema heti, ettei sivu välähdä väärän värisenä */
@@ -34,7 +48,7 @@ try { var t = localStorage.getItem("bmm.theme") || "dark";
   document.documentElement.dataset.theme = t; } catch (e) { document.documentElement.dataset.theme = "dark"; }</script>
 <link rel="icon" type="image/png" href="/static/icons/favicon-32.png">
 <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
-<script src="/static/vendor/leaflet/leaflet.js"></script>
+<script src="/static/vendor/leaflet/leaflet.js" onerror="bmmScriptFail(this)"></script><script>window.bmmStage = "leaflet ladattu";</script>
 <style>
   :root {
     --bg: #0f1419; --panel: #171e26; --line: #26313d; --text: #d9e1e8; --muted: #7d8b99;
@@ -2045,11 +2059,11 @@ try { var t = localStorage.getItem("bmm.theme") || "dark";
   <a id="pExt" href="#" target="_blank" rel="noopener">Hoseline ↗</a>
   <button id="dockClose">Lopeta</button>
 </div>
-<script src="/static/i18n.de.js"></script>
-<script src="/static/i18n.es.js"></script>
-<script src="/static/i18n.fr.js"></script>
-<script src="/static/i18n.js"></script>
-<script src="/static/player.js"></script>
+<script src="/static/i18n.de.js" onerror="bmmScriptFail(this)"></script><script>window.bmmStage = "i18n.de.js ladattu";</script>
+<script src="/static/i18n.es.js" onerror="bmmScriptFail(this)"></script><script>window.bmmStage = "i18n.es.js ladattu";</script>
+<script src="/static/i18n.fr.js" onerror="bmmScriptFail(this)"></script><script>window.bmmStage = "i18n.fr.js ladattu";</script>
+<script src="/static/i18n.js" onerror="bmmScriptFail(this)"></script><script>window.bmmStage = "i18n.js ladattu";</script>
+<script src="/static/player.js" onerror="bmmScriptFail(this)"></script><script>window.bmmStage = "player.js ladattu";</script>
 
 <script>
 window.bmmStage = "pääskripti alkoi";

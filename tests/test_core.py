@@ -1237,7 +1237,7 @@ def test_spanish_translation_complete():
     for en, es in ES.items():
         assert sorted(ph.findall(en)) == sorted(ph.findall(es)), en
     html = (root / "index.html").read_text("utf-8")
-    assert '<script src="/static/i18n.es.js"></script>' in html and '<option value="es">Español</option>' in html
+    assert '<script src="/static/i18n.es.js' in html and '<option value="es">Español</option>' in html
     try:
         i18n.set_lang("es")
         assert i18n.tr("Tuntematon komento. Laheta OHJE") == "Comando desconocido. Envía CMD"
@@ -1333,7 +1333,7 @@ def test_french_translation_complete():
     for en, fr in FR.items():
         assert sorted(ph.findall(en)) == sorted(ph.findall(fr)), en
     html = (root / "index.html").read_text("utf-8")
-    assert '<script src="/static/i18n.fr.js"></script>' in html and '<option value="fr">Français</option>' in html
+    assert '<script src="/static/i18n.fr.js' in html and '<option value="fr">Français</option>' in html
     try:
         i18n.set_lang("fr")
         assert i18n.tr("Tuntematon komento. Laheta OHJE") == "Commande inconnue. Envoyez CMD"
