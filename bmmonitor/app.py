@@ -1058,7 +1058,14 @@ def make_app(mon: Monitor) -> web.Application:
                                      status=403)
         return await handler(request)
 
+    async def no_stale_page(request, response):
+        """Sivu ja sen skriptit aina tuoreina: päivityksen jälkeen selain (esim. iPadin Safari) ei saa yhdistellä
+        uutta sivua ja vanhoja välimuistissa olevia skriptejä. Karttatiilet saavat jäädä välimuistiin."""
+        if request.path == "/" or request.path == "/login" or request.path.startswith("/static/"):
+            response.headers["Cache-Control"] = "no-cache"
+
     app = web.Application(middlewares=[lan_guard])
+    app.on_response_prepare.append(no_stale_page)
 
     async def index(_):
         return web.FileResponse(STATIC_DIR / "index.html")
